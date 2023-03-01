@@ -25,7 +25,7 @@ contract Artifact is IArtifact {
     uint public rewardFlow;
     uint public accReward;
     uint private _totalSupply;
-    bool public isProposed;
+    bool private _isProposed;
 
     // Where do the incoming rewards flow? 
     mapping (address => uint32) budgetFlow;
@@ -51,7 +51,6 @@ contract Artifact is IArtifact {
         budgetFlow[address(this)] = uint32(1);
     }
 
-
     /** 
       * Given some input honor to this artifact, return the output vouch amount. 
     */
@@ -65,7 +64,7 @@ contract Artifact is IArtifact {
 
         vouchAmt = SafeMath.sub(Babylonian.sqrt(totalHonor), Babylonian.sqrt(honorWithin));
 
-        // emit Vouch(account, address(this), deposit, vouchAmt);
+        emit Vouch(account, address(this), deposit, vouchAmt);
         _mint(account, vouchAmt);
         honorWithin += deposit;
         // _balances[account] += vouchAmt;
@@ -83,19 +82,21 @@ contract Artifact is IArtifact {
     /** 
       * Given some input vouching claim to this artifact, return the output honor. 
     */
-    function unvouch(address to, uint unvouchAmt) external returns(uint hnrAmt) {
+    function unvouch(address account, address to, uint unvouchAmt) external returns(uint hnrAmt) {
 
-        require(_balances[msg.sender] >= unvouchAmt, "Insufficient vouching balance");
-        require(ISTT(honorAddr).balanceOf(to) != 0, "Invalid vouching target");
+        require(_balances[account] >= unvouchAmt, "Insufficient vouching balance");
+        // require(ISTT(honorAddr).balanceOf(to) != 0, "Invalid vouching target");
 
-        uint prevVouchSqrt = SafeMath.floorSqrt(_totalSupply);
-        uint unvouchSqrt = SafeMath.floorSqrt(SafeMath.sub(_totalSupply, unvouchAmt));
+        // uint prevVouchSqrt = SafeMath.floorSqrt(_totalSupply);
+        // uint unvouchSqrt = SafeMath.floorSqrt(SafeMath.sub(_totalSupply, unvouchAmt));
+        uint vouchedPost = SafeMath.sub(_totalSupply, unvouchAmt);
 
-        hnrAmt = SafeMath.sub(prevVouchSqrt ** 3, unvouchSqrt ** 3);
+        hnrAmt = SafeMath.sub(_totalSupply ** 2, vouchedPost ** 2);
 
-        emit Unvouch(msg.sender, address(this), hnrAmt, unvouchAmt);
-        _burn(msg.sender, unvouchAmt);
-        _balances[msg.sender] -= unvouchAmt;
+        emit Unvouch(account, address(this), hnrAmt, unvouchAmt);
+        honorWithin -= hnrAmt;
+        _burn(account, unvouchAmt);
+        _balances[account] -= unvouchAmt;
         recomputeBudget();
     }
 
@@ -106,6 +107,23 @@ contract Artifact is IArtifact {
     function balanceOf(address addr) public view returns(uint) {
         return _balances[addr];
     }
+
+    function receiveDonation() external returns(uint) {
+        uint totalHonor = ISTT(honorAddr).balanceOf(address(this));
+        honorWithin += SafeMath.sub(totalHonor, honorWithin);
+        return honorWithin;
+    }
+
+    function isValidated() external view returns(bool) {
+        return !_isProposed;
+    }
+
+    function validate() external returns(bool) {
+        require(msg.sender == honorAddr);
+        _isProposed = false;
+        return !_isProposed;
+    }
+    
 
     function _mint(address account, uint256 amount) internal virtual {
         // require(account != address(0), "ERC20: mint to the zero address");

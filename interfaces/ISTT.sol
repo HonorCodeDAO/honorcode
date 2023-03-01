@@ -16,6 +16,7 @@ interface ISTT {
     // }
 
     function balanceOf(address artifact) external view returns (uint256);
+    event Transfer(address indexed from, address indexed to, uint256 value);
     // function getArtifactData(address addr) public view returns (data memory);
 
 

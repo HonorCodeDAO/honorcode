@@ -39,10 +39,27 @@ contract Honor is ISTT {
         require(_balances[rootArtifact] > 0, "root balance 0");
         root.initVouch(msg.sender, 10000);
         _balances[rootArtifact] = 10000;
+        root.setRoot();
     }
 
     function balanceOf(address addr) public view returns(uint) {
         return _balances[addr]; 
+    }
+
+    function balanceOfArtifact(address addr, address account) public view returns(uint) {
+        return IArtifact(addr).balanceOf(account);
+    }
+
+    function internalHonorBalanceOfArtifact(address addr) public view returns(uint) {
+        return IArtifact(addr).internalHonor();
+    }
+    
+    function getArtifactBuilder(address addr) public view returns(address) {
+        return IArtifact(addr).getBuilder();
+    }
+
+    function getArtifactAccumulatedHonorHours(address addr) public view returns(uint) {
+        return IArtifact(addr).accumulatedHonorHours();
     }
 
     function getRootArtifact() public view returns(address) {
@@ -52,6 +69,8 @@ contract Honor is ISTT {
     function getArtifactData(address addr) public view returns (ArtifactData.data memory) {
         return artifacts[addr];
     }
+
+    
 
     // function getArtifactBalance(address addr) public view returns(uint) {
     //     return int(artifacts[addr].posHNR) - int(artifacts[addr].negHNR);

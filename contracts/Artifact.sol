@@ -24,8 +24,10 @@ contract Artifact is IArtifact {
     uint public builderHonor;
     uint public rewardFlow;
     uint public accReward;
+    uint64 private _lastUpdated;
     uint private _totalSupply;
     bool private _isProposed;
+    bool private _isRoot;
 
     // Where do the incoming rewards flow? 
     mapping (address => uint32) budgetFlow;
@@ -40,8 +42,8 @@ contract Artifact is IArtifact {
 
     mapping (address => uint) private _balances;
 
-    event Vouch(address indexed _vouchingAddr, address indexed _to, uint256 _honorAmt, uint256 _vouchAmt);
-    event Unvouch(address indexed _vouchingAddr, address indexed _from, uint256 _honorAmt, uint256 _vouchAmt);
+    // event Vouch(address indexed _vouchingAddr, address indexed _to, uint256 _honorAmt, uint256 _vouchAmt);
+    // event Unvouch(address indexed _vouchingAddr, address indexed _from, uint256 _honorAmt, uint256 _vouchAmt);
 
     constructor(address builderAddr, address honorAddress, string memory artifactLoc) {
         builder = builderAddr;
@@ -49,6 +51,7 @@ contract Artifact is IArtifact {
         honorAddr = honorAddress;
         _balances[tx.origin] = 0;
         budgetFlow[address(this)] = uint32(1);
+        _lastUpdated = uint64(block.timestamp);
     }
 
     /** 
@@ -69,6 +72,7 @@ contract Artifact is IArtifact {
         honorWithin += deposit;
         // _balances[account] += vouchAmt;
         recomputeBudget();
+        recomputeBuilderVouch();
     }
 
     function initVouch(address account, uint inputHonor) external returns(uint vouchAmt) {
@@ -98,14 +102,42 @@ contract Artifact is IArtifact {
         _burn(account, unvouchAmt);
         _balances[account] -= unvouchAmt;
         recomputeBudget();
+        recomputeBuilderVouch();
     }
 
     function recomputeBudget() private returns (bool computed) {
         return true;
     }
 
+    function recomputeBuilderVouch() private returns (uint newBuilderVouchAmt) {
+        if (_isRoot) { return 0; }
+        uint64 timeElapsed = uint64(block.timestamp) - _lastUpdated;
+        uint newHonorHours = (uint(timeElapsed) * honorWithin) / 86400;
+        newBuilderVouchAmt = SafeMath.floorCbrt(accHonorHours + newHonorHours) - SafeMath.floorCbrt(accHonorHours);
+        accHonorHours += newHonorHours;
+        _lastUpdated = uint64(block.timestamp);
+        if (newBuilderVouchAmt <= 0) {
+            return newBuilderVouchAmt;
+        }
+        emit Vouch(builder, address(this), 0, newBuilderVouchAmt);
+        _mint(builder, newBuilderVouchAmt);
+        // return newBuilderVouchAmt;
+    }
+
     function balanceOf(address addr) public view returns(uint) {
         return _balances[addr];
+    }
+
+    function getBuilder() external view returns(address) {
+        return builder;
+    }
+
+    function internalHonor() external view returns(uint) {
+        return honorWithin;
+    }
+
+    function accumulatedHonorHours() external view returns(uint) {
+        return accHonorHours;
     }
 
     function receiveDonation() external returns(uint) {
@@ -118,19 +150,24 @@ contract Artifact is IArtifact {
         return !_isProposed;
     }
 
+    function setRoot() external returns(bool) {
+        require(msg.sender == honorAddr);
+        _isRoot = true;
+        return _isRoot;
+    }
+
     function validate() external returns(bool) {
         require(msg.sender == honorAddr);
         _isProposed = false;
         return !_isProposed;
     }
-    
 
     function _mint(address account, uint256 amount) internal virtual {
         // require(account != address(0), "ERC20: mint to the zero address");
 
         _totalSupply += amount;
         _balances[account] += amount;
-        // emit Transfer(address(0), account, amount);
+        emit Transfer(address(0), account, amount);
     }
 
     function _burn(address account, uint256 amount) internal virtual {
@@ -144,9 +181,6 @@ contract Artifact is IArtifact {
         // emit Vouch(account, address(0), amount);
     }
 
-    /**
-     * @dev See {IERC20-totalSupply}.
-     */
     function totalSupply() public view returns (uint256) {
         return _totalSupply;
     }

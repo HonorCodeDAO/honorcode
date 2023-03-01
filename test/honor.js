@@ -1,5 +1,20 @@
 const Honor = artifacts.require("Honor");
 const Artifact = artifacts.require("Artifact");
+const { time } = require("@openzeppelin/test-helpers");
+
+advanceTime = (time) => {
+  return new Promise((resolve, reject) => {
+    web3.currentProvider.send({
+      jsonrpc: '2.0',
+      method: 'evm_increaseTime',
+      params: [time],
+      id: new Date().getTime()
+    }, (err, result) => {
+      if (err) { return reject(err) }
+      return resolve(result)
+    })
+  })
+}
 
 contract('Honor', (accounts, deployer) => {
   it('should put 10000 Honor in the first account', async () => {
@@ -69,7 +84,39 @@ contract('Honor', (accounts, deployer) => {
     // const expectedHonorOutput = accountOneStartingBalance2 - (accountOneStartingBalance2 ** 0.5 - amount)**2;
     const expectedHonorOutput = 197;
 
+    const internalHonor = (await HonorInstance.internalHonorBalanceOfArtifact.call(newAddr)).toNumber();
+    assert.equal(accountTwoEndingBalance, internalHonor, "Amount isn't what artifact thinks");
+
     assert.equal(accountOneEndingBalance, accountOneStartingBalance2 - expectedHonorOutput, "Amount wasn't correctly taken from the sender");
     assert.equal(accountTwoEndingBalance, accountTwoStartingBalance + expectedHonorOutput, "Amount wasn't correctly sent to the receiver");
   });
+  it('should credit builder correctly', async () => {
+
+    let duration = time.duration.seconds(360000);
+
+    const builderTwo = accounts[2];
+    const HonorInstance = await Honor.deployed();
+    const rootAddr = await HonorInstance.getRootArtifact.call();
+    const rootBalance = await HonorInstance.balanceOf.call(rootAddr);
+    const newAddr = await HonorInstance.proposeArtifact.call(rootAddr, builderTwo, 'new artifact');
+    await HonorInstance.proposeArtifact(rootAddr, builderTwo, 'new artifact');
+    await HonorInstance.vouch(rootAddr, newAddr, 10);
+    const internalHonor = (await HonorInstance.internalHonorBalanceOfArtifact.call(newAddr)).toNumber();
+
+    const builderA = (await HonorInstance.getArtifactBuilder.call(newAddr));
+
+    const builderStartingBalance = (await HonorInstance.balanceOfArtifact.call(newAddr, builderTwo)).toNumber();
+    // advanceTime(36000);
+    // console.log((await HonorInstance.getArtifactAccumulatedHonorHours.call(newAddr)).toNumber());
+    await time.increase(duration);
+    await HonorInstance.vouch(rootAddr, newAddr, 1);
+    // console.log((await HonorInstance.getArtifactAccumulatedHonorHours.call(newAddr)).toNumber());
+
+    const builderEndingBalance = (await HonorInstance.balanceOfArtifact.call(newAddr, builderTwo)).toNumber();
+
+    const expectedBuilderChange = 20;
+    assert.equal(builderEndingBalance, builderStartingBalance + expectedBuilderChange, "Incorrect change for builder");
+
+  });
+
 });

@@ -11,5 +11,11 @@ interface IArtifact {
     function isValidated() external view returns(bool);
     function validate() external returns(bool);
     function receiveDonation() external returns(uint);
-
+    function internalHonor() external view returns(uint);
+    function getBuilder() external view returns(address);
+    function accumulatedHonorHours() external view returns(uint);
+    function setRoot() external returns(bool);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Vouch(address indexed _vouchingAddr, address indexed _to, uint256 _honorAmt, uint256 _vouchAmt);
+    event Unvouch(address indexed _vouchingAddr, address indexed _from, uint256 _honorAmt, uint256 _vouchAmt);
 }

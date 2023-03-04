@@ -52,19 +52,13 @@ contract('Honor', (accounts, deployer) => {
     // Make transaction from first account to second.
     const amount = 10;
     const amountHonor = 100;
-    // await HonorInstance.sendCoin(accountTwo, amount, { from: accountOne });
-
 
     const accountOneStartingBalance = (await HonorInstance.balanceOf.call(rootAddr)).toNumber();
 
-    console.log("accountOneStartingBalance");
-    console.log(accountOneStartingBalance);
-    console.log(rootAddr);
 
     const newAddr = await HonorInstance.proposeArtifact.call(rootAddr, accountThree, 'new artifact');
     await HonorInstance.proposeArtifact(rootAddr, accountThree, 'new artifact');
-    console.log('proposed!');
-    console.log(newAddr);
+
     const accountOneStartingBalance1 = (await HonorInstance.balanceOf.call(rootAddr)).toNumber();
     console.log(accountOneStartingBalance1);
     await HonorInstance.validateArtifact(rootAddr, newAddr);
@@ -72,8 +66,6 @@ contract('Honor', (accounts, deployer) => {
     const accountOneStartingBalance2 = (await HonorInstance.balanceOf.call(rootAddr)).toNumber();
     const accountTwoStartingBalance = (await HonorInstance.balanceOf.call(newAddr)).toNumber();
 
-    console.log("accountOneStartingBalance");
-    console.log(accountOneStartingBalance2);
 
     await HonorInstance.vouch(rootAddr, newAddr, 1);
 

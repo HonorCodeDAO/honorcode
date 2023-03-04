@@ -3,7 +3,6 @@
 pragma solidity ^0.8.13;
 
 import "./SafeMath.sol";
-import "./Babylonian.sol";
 import "../interfaces/IArtifact.sol";
 import "../interfaces/ISTT.sol";
 
@@ -21,43 +20,40 @@ contract Artifact is IArtifact {
     address public builder;
     uint public honorWithin;
     uint public accHonorHours;
+    uint public totalIncomingRewardFlow;
     uint public builderHonor;
-    uint public rewardFlow;
     uint public accReward;
     uint64 private _lastUpdated;
     uint private _totalSupply;
     bool private _isProposed;
     bool private _isRoot;
 
+    // Where are the incoming rewards coming from? These sum to the total flow. 
+    // mapping (address => uint) incomeFlow;
     // Where do the incoming rewards flow? 
-    mapping (address => uint32) budgetFlow;
+    // mapping (address => uint) budgetFlow;
     // Where is everybody voting for these rewards to flow? The aggregate value 
-    // above will be calculated from a weighted sum of individual submitted budgets. 
-    mapping (address => mapping (address => uint32)) budgets;
-
-    uint public constant ALPHANUM = 2;
-    uint public constant ALPHADENOM = 3;
-    uint public constant BETANUM = 1;
-    uint public constant BETADENOM = 3;
+    // above will be calculated from a sum weighted (by vouch size) of individual submitted budgets. 
+    // If not set, will default to status quo. 
+    // mapping (address => mapping (address => uint)) budgets;
 
     mapping (address => uint) private _balances;
-
-    // event Vouch(address indexed _vouchingAddr, address indexed _to, uint256 _honorAmt, uint256 _vouchAmt);
-    // event Unvouch(address indexed _vouchingAddr, address indexed _from, uint256 _honorAmt, uint256 _vouchAmt);
+    mapping (address => uint) private _staked;
 
     constructor(address builderAddr, address honorAddress, string memory artifactLoc) {
         builder = builderAddr;
         location = artifactLoc;
         honorAddr = honorAddress;
         _balances[tx.origin] = 0;
-        budgetFlow[address(this)] = uint32(1);
+        // Default is to keep all flow to this artifact.
+        // budgetFlow[address(this)] = 1 << 32 - 1;
         _lastUpdated = uint64(block.timestamp);
     }
 
     /** 
       * Given some input honor to this artifact, return the output vouch amount. 
     */
-    function vouch(address account) external returns(uint vouchAmt) {
+    function vouch(address account) external override returns(uint vouchAmt) {
         uint totalHonor = ISTT(honorAddr).balanceOf(address(this));
         uint deposit = SafeMath.sub(totalHonor, honorWithin);
 
@@ -65,22 +61,19 @@ contract Artifact is IArtifact {
         // uint prevHonorCbrt = SafeMath.floorCbrt(honorWithin);
         // vouchAmt = SafeMath.sub(honorCbrt * honorCbrt, prevHonorCbrt * prevHonorCbrt);
 
-        vouchAmt = SafeMath.sub(Babylonian.sqrt(totalHonor), Babylonian.sqrt(honorWithin));
+        vouchAmt = SafeMath.sub(SafeMath.floorSqrt(totalHonor), SafeMath.floorSqrt(honorWithin));
 
         emit Vouch(account, address(this), deposit, vouchAmt);
         _mint(account, vouchAmt);
         honorWithin += deposit;
-        // _balances[account] += vouchAmt;
-        recomputeBudget();
         recomputeBuilderVouch();
     }
 
     function initVouch(address account, uint inputHonor) external returns(uint vouchAmt) {
         require(msg.sender == honorAddr, "Only used for initial root vouching");
-        vouchAmt = Babylonian.sqrt(inputHonor);
+        vouchAmt = SafeMath.floorSqrt(inputHonor);
         _mint(account, vouchAmt);
         honorWithin += inputHonor;
-        recomputeBudget();
     }
 
     /** 
@@ -91,8 +84,6 @@ contract Artifact is IArtifact {
         require(_balances[account] >= unvouchAmt, "Insufficient vouching balance");
         // require(ISTT(honorAddr).balanceOf(to) != 0, "Invalid vouching target");
 
-        // uint prevVouchSqrt = SafeMath.floorSqrt(_totalSupply);
-        // uint unvouchSqrt = SafeMath.floorSqrt(SafeMath.sub(_totalSupply, unvouchAmt));
         uint vouchedPost = SafeMath.sub(_totalSupply, unvouchAmt);
 
         hnrAmt = SafeMath.sub(_totalSupply ** 2, vouchedPost ** 2);
@@ -101,13 +92,29 @@ contract Artifact is IArtifact {
         honorWithin -= hnrAmt;
         _burn(account, unvouchAmt);
         _balances[account] -= unvouchAmt;
-        recomputeBudget();
         recomputeBuilderVouch();
     }
 
-    function recomputeBudget() private returns (bool computed) {
-        return true;
-    }
+    /* 
+     * Only recompute for the specific address, to avoid having to sum everything. 
+     */
+    // function recomputeBudget(address account, address artifactFrom, address artifactTo) private returns (bool computed) {
+    //     uint vouchAmt = _balances[account];
+    //     if (vouchAmt == 0) { return true; }
+    //     return true;
+    // }
+
+    // function setBudget(address account, address artifactFrom, address artifactTo, uint amount) private returns (bool budgetSet) {
+    //     require(budgets[account][artifactFrom] >= amount && amount < 1 << 32);
+    //     require(account == honorAddr || account == msg.sender);
+    //     if (artifactFrom == address(this)) {
+    //         require(budgets[account][artifactFrom] > amount);
+    //     }
+    //     budgets[account][artifactFrom] -= amount;
+    //     budgets[account][artifactTo] += amount;
+    //     return recomputeBudget(account);
+    // }
+
 
     function recomputeBuilderVouch() private returns (uint newBuilderVouchAmt) {
         if (_isRoot) { return 0; }
@@ -121,50 +128,47 @@ contract Artifact is IArtifact {
         }
         emit Vouch(builder, address(this), 0, newBuilderVouchAmt);
         _mint(builder, newBuilderVouchAmt);
-        // return newBuilderVouchAmt;
     }
 
     function balanceOf(address addr) public view returns(uint) {
         return _balances[addr];
     }
 
-    function getBuilder() external view returns(address) {
+    function getBuilder() external override view returns(address) {
         return builder;
     }
 
-    function internalHonor() external view returns(uint) {
+    function internalHonor() external override view returns(uint) {
         return honorWithin;
     }
 
-    function accumulatedHonorHours() external view returns(uint) {
+    function accumulatedHonorHours() external override view returns(uint) {
         return accHonorHours;
     }
 
-    function receiveDonation() external returns(uint) {
+    function receiveDonation() external override returns(uint) {
         uint totalHonor = ISTT(honorAddr).balanceOf(address(this));
         honorWithin += SafeMath.sub(totalHonor, honorWithin);
         return honorWithin;
     }
 
-    function isValidated() external view returns(bool) {
+    function isValidated() external override view returns(bool) {
         return !_isProposed;
     }
 
-    function setRoot() external returns(bool) {
+    function setRoot() external override returns(bool) {
         require(msg.sender == honorAddr);
         _isRoot = true;
         return _isRoot;
     }
 
-    function validate() external returns(bool) {
+    function validate() external override returns(bool) {
         require(msg.sender == honorAddr);
         _isProposed = false;
         return !_isProposed;
     }
 
     function _mint(address account, uint256 amount) internal virtual {
-        // require(account != address(0), "ERC20: mint to the zero address");
-
         _totalSupply += amount;
         _balances[account] += amount;
         emit Transfer(address(0), account, amount);
@@ -178,7 +182,7 @@ contract Artifact is IArtifact {
         _balances[account] = accountBalance - amount;
         _totalSupply -= amount;
 
-        // emit Vouch(account, address(0), amount);
+        emit Transfer(account, address(0), amount);
     }
 
     function totalSupply() public view returns (uint256) {

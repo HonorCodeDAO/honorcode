@@ -11,23 +11,16 @@ import "../interfaces/ISTT.sol";
 // artifacts, acts as a go-between during vouching/unvouching artifacts, 
 // and manages the cash flow collection and resulting HONOR mints.
 
-library ArtifactData {
-  struct data {
-     uint posHNR;
-     uint negHNR;
-     uint posFlow;
-     uint negFlow;
-     bool isProposed;
-     bool isLive;
-   }
-}
-
 contract Honor is ISTT {
     mapping (address => uint) private _balances;
-    mapping (address => ArtifactData.data) artifacts;
+    // mapping (address => ArtifactData.data) artifacts;
     address public rootArtifact;
+    address public stakedAssetAddr;
     uint private _totalSupply;
     uint constant VALIDATE_AMT = 1;
+    uint32 constant public INFLATION_PER_THOUSAND_PER_YEAR_STAKER = 500;
+    uint32 constant public INFLATION_PER_THOUSAND_PER_YEAR_VOUCHER = 500;
+    uint32 constant public EXPECTED_REWARD_PER_YEAR_PER_THOUSAND_STAKED = 30;
 
     event Vouch(address _account, address indexed _from, address indexed _to, uint256 _value);
 
@@ -40,6 +33,10 @@ contract Honor is ISTT {
         root.initVouch(msg.sender, 10000);
         _balances[rootArtifact] = 10000;
         root.setRoot();
+    }
+
+    function getStakedAssetAddress() public view returns(address) {
+        return stakedAssetAddr; 
     }
 
     function balanceOf(address addr) public view returns(uint) {
@@ -66,27 +63,17 @@ contract Honor is ISTT {
         return rootArtifact; 
     }
 
-    function getArtifactData(address addr) public view returns (ArtifactData.data memory) {
-        return artifacts[addr];
-    }
-
-    
-
-    // function getArtifactBalance(address addr) public view returns(uint) {
-    //     return int(artifacts[addr].posHNR) - int(artifacts[addr].negHNR);
-    // }
-
     function vouch(address _from, address _to, uint amount) public returns(uint revouchAmt) {
         require(_balances[_to] != 0 && _balances[_from] != 0 && IArtifact(_to).isValidated(), 
             "Invalid vouching target");
-        require(IArtifact(_from).balanceOf(msg.sender) >= amount, "Insufficient vouch balance");
+        require(IArtifact(_from).balanceOf(tx.origin) >= amount, "Insufficient vouch balance");
 
-        uint hnrAmt = IArtifact(_from).unvouch(msg.sender, _to, amount);
+        uint hnrAmt = IArtifact(_from).unvouch(tx.origin, _to, amount);
         _transfer(_from, _to, hnrAmt);
 
-        revouchAmt = IArtifact(_to).vouch(msg.sender); 
+        revouchAmt = IArtifact(_to).vouch(tx.origin); 
 
-        emit Vouch(msg.sender, _from, _to, hnrAmt);
+        emit Vouch(tx.origin, _from, _to, hnrAmt);
     }
 
     function proposeArtifact(address _from, address builder, string memory location) public returns(address proposedAddr) { 
@@ -118,15 +105,12 @@ contract Honor is ISTT {
 
         _totalSupply += amount;
         _balances[account] += amount;
-        // emit Transfer(address(0), account, amount);
+        emit Transfer(address(0), account, amount);
     }
 
     function _transfer(address sender, address recipient, uint256 amount) internal virtual {
         require(sender != address(0), "HONOR: transfer from the zero address");
         require(recipient != address(0), "HONOR: transfer to the zero address");
-
-        // require(artifacts[sender] 
-        // require(_balances[recipient] > 0);
 
         uint256 senderBalance = _balances[sender];
         require(senderBalance >= amount, "HONOR: transfer amount exceeds balance");

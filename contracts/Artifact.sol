@@ -18,15 +18,20 @@ contract Artifact is IArtifact {
     string public location; 
     address public honorAddr;
     address public builder;
+    uint public antihonorWithin;
     uint public honorWithin;
+    uint public netHonor;
     uint public accHonorHours;
-    uint public totalIncomingRewardFlow;
+    // uint public totalIncomingRewardFlow;
     uint public builderHonor;
-    uint public accReward;
+    // uint public accReward;
+    // uint public virtualStaked;
     uint64 private _lastUpdated;
     uint private _totalSupply;
     bool private _isProposed;
     bool private _isRoot;
+
+    // uint public constant rewardMult = 1;
 
     // Where are the incoming rewards coming from? These sum to the total flow. 
     // mapping (address => uint) incomeFlow;
@@ -38,7 +43,7 @@ contract Artifact is IArtifact {
     // mapping (address => mapping (address => uint)) budgets;
 
     mapping (address => uint) private _balances;
-    mapping (address => uint) private _staked;
+    // mapping (address => uint) private _staked;
 
     constructor(address builderAddr, address honorAddress, string memory artifactLoc) {
         builder = builderAddr;
@@ -55,7 +60,7 @@ contract Artifact is IArtifact {
     */
     function vouch(address account) external override returns(uint vouchAmt) {
         uint totalHonor = ISTT(honorAddr).balanceOf(address(this));
-        uint deposit = SafeMath.sub(totalHonor, honorWithin);
+        uint deposit = SafeMath.sub(totalHonor, honorWithin + antihonorWithin);
 
         // uint honorCbrt = SafeMath.floorCbrt(totalHonor);
         // uint prevHonorCbrt = SafeMath.floorCbrt(honorWithin);
@@ -65,19 +70,43 @@ contract Artifact is IArtifact {
 
         emit Vouch(account, address(this), deposit, vouchAmt);
         _mint(account, vouchAmt);
-        honorWithin += deposit;
         recomputeBuilderVouch();
+        honorWithin += deposit;
+        netHonor += deposit;
     }
+
+
+    /** 
+      * Given some input honor to this artifact, return the output vouch amount. 
+    */
+    // function antivouch(address account) external override returns(uint vouchAmt) {
+    //     uint totalHonor = ISTT(honorAddr).balanceOf(address(this));
+    //     uint deposit = SafeMath.sub(totalHonor, honorWithin + antihonorWithin);
+
+    //     // uint honorCbrt = SafeMath.floorCbrt(totalHonor);
+    //     // uint prevHonorCbrt = SafeMath.floorCbrt(honorWithin);
+    //     // vouchAmt = SafeMath.sub(honorCbrt * honorCbrt, prevHonorCbrt * prevHonorCbrt);
+
+    //     vouchAmt = SafeMath.sub(SafeMath.floorSqrt(totalHonor), SafeMath.floorSqrt(honorWithin));
+
+    //     emit Vouch(account, address(this), deposit, vouchAmt);
+    //     _mint(account, vouchAmt);
+    //     recomputeBuilderVouch();
+    //     antihonorWithin += deposit;
+    //     netHonor -= deposit;
+
+    // }
 
     function initVouch(address account, uint inputHonor) external returns(uint vouchAmt) {
         require(msg.sender == honorAddr, "Only used for initial root vouching");
         vouchAmt = SafeMath.floorSqrt(inputHonor);
         _mint(account, vouchAmt);
         honorWithin += inputHonor;
+        netHonor += inputHonor;
     }
 
     /** 
-      * Given some input vouching claim to this artifact, return the output honor. 
+      * Given some valid input vouching claim to this artifact, return the output honor. 
     */
     function unvouch(address account, address to, uint unvouchAmt) external returns(uint hnrAmt) {
 
@@ -89,11 +118,32 @@ contract Artifact is IArtifact {
         hnrAmt = SafeMath.sub(_totalSupply ** 2, vouchedPost ** 2);
 
         emit Unvouch(account, address(this), hnrAmt, unvouchAmt);
+        recomputeBuilderVouch();
         honorWithin -= hnrAmt;
+        netHonor -= hnrAmt;
         _burn(account, unvouchAmt);
         _balances[account] -= unvouchAmt;
-        recomputeBuilderVouch();
     }
+
+    /** 
+      * Given some valid input vouching claim to this artifact, return the output honor. 
+    */
+    // function unantivouch(address account, address to, uint unvouchAmt) external returns(uint hnrAmt) {
+
+    //     require(_balances[account] >= unvouchAmt, "Insufficient vouching balance");
+    //     // require(ISTT(honorAddr).balanceOf(to) != 0, "Invalid vouching target");
+
+    //     uint vouchedPost = SafeMath.sub(_totalSupply, unvouchAmt);
+
+    //     hnrAmt = SafeMath.sub(_totalSupply ** 2, vouchedPost ** 2);
+
+    //     emit Unvouch(account, address(this), hnrAmt, unvouchAmt);
+    //     recomputeBuilderVouch();
+    //     antihonorWithin -= hnrAmt;
+    //     netHonor += hnrAmt;
+    //     _burn(account, unvouchAmt);
+    //     _balances[account] -= unvouchAmt;
+    // }
 
     /* 
      * Only recompute for the specific address, to avoid having to sum everything. 
@@ -115,11 +165,17 @@ contract Artifact is IArtifact {
     //     return recomputeBudget(account);
     // }
 
+    // function accumulateReward(uint64 timeElapsed) private {
+    //     accReward += virtualStaked * uint(timeElapsed) / rewardMult;
+    // }
 
+    /* 
+     * The amount of the vouch claim going to the builder will increase based on the vouched HONOR over time. 
+     */
     function recomputeBuilderVouch() private returns (uint newBuilderVouchAmt) {
         if (_isRoot) { return 0; }
         uint64 timeElapsed = uint64(block.timestamp) - _lastUpdated;
-        uint newHonorHours = (uint(timeElapsed) * honorWithin) / 86400;
+        uint newHonorHours = (uint(timeElapsed) * netHonor) / 86400;
         newBuilderVouchAmt = SafeMath.floorCbrt(accHonorHours + newHonorHours) - SafeMath.floorCbrt(accHonorHours);
         accHonorHours += newHonorHours;
         _lastUpdated = uint64(block.timestamp);
@@ -138,9 +194,14 @@ contract Artifact is IArtifact {
         return builder;
     }
 
-    function internalHonor() external override view returns(uint) {
+    function getInternalHonor() external override view returns(uint) {
         return honorWithin;
     }
+
+    function getNetHonor() external override view returns(uint) {
+        return honorWithin;
+    }
+
 
     function accumulatedHonorHours() external override view returns(uint) {
         return accHonorHours;
@@ -185,7 +246,7 @@ contract Artifact is IArtifact {
         emit Transfer(account, address(0), amount);
     }
 
-    function totalSupply() public view returns (uint256) {
+    function totalSupply() external override view returns (uint256) {
         return _totalSupply;
     }
 }

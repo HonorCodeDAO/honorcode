@@ -2,8 +2,9 @@
 // Tells the Solidity compiler to compile only from v0.8.13 to v0.9.0
 pragma solidity ^0.8.13;
 
-import "./Artifact.sol";
+// import "./Artifact.sol";
 import "./SafeMath.sol";
+import "./BudgetQueue.sol";
 import "../interfaces/IArtifact.sol";
 import "../interfaces/IGeras.sol";
 import "../interfaces/IRewardFlow.sol";
@@ -22,40 +23,47 @@ struct Allocation {
     uint amount;
 }
 
+
+contract RewardFlowFactory {
+    function createRewardFlow(address stakedAssetAddr_, address artifactAddr_, address gerasAddr_) public returns(RewardFlow) {
+        return new RewardFlow(stakedAssetAddr_, artifactAddr_, gerasAddr_);
+    }
+}
+
 contract RewardFlow is IRewardFlow {
     mapping (address => Allocation) allocations;
-    mapping (address => mapping (address => uint)) flows;
     mapping (address => uint) positions; 
 
-    uint32 constant public MAX_SLOT_SIZE = 16; 
+    // mapping (address => mapping (address => uint)) flows;
+    // uint32 constant public MAX_SLOT_SIZE = 16; 
+
     uint32 constant public FRACTION_TO_PASS = 4; 
-    uint32 constant public RATE_TO_ACCRUE = 100000;
+    // uint32 constant public RATE_TO_ACCRUE = 100000;
     uint32 constant public MAX_ALLOCATION = 1024;
 
     // RewardFlow[] private slots; 
     // uint[] budget; 
     BudgetQueue private bq;
-    uint public min_flow;
-    uint32 public min_flow_index;
+    // uint public min_flow;
+    // uint32 public min_flow_index;
     address public artifactAddr;
     address public gerasAddr;
     address public stakedAssetAddr;
-    address public honorAddr;
+    // address public honorAddr;
     uint public accumulatedPayout;
     uint public availableReward;
     uint public escrowedGeras;
     uint32 public _lastUpdated;
 
 
-    constructor(address stakedAssetAddr_, address artifactAddr_, address honorAddr_, address gerasAddr_) {
+    constructor(address stakedAssetAddr_, address artifactAddr_, address gerasAddr_) {
         artifactAddr = artifactAddr_;
         stakedAssetAddr = stakedAssetAddr_;
-        honorAddr = honorAddr_;
         gerasAddr = gerasAddr_;
         // Default is to keep all flow to this artifact.
         // budgetFlow[address(this)] = 1 << 32 - 1;
         _lastUpdated = uint32(block.timestamp);
-        bq = new BudgetQueue();
+        // bq = new BudgetQueue();
     }
 
     function getArtifact() external override view returns (address) {
@@ -87,6 +95,9 @@ contract RewardFlow is IRewardFlow {
         accumulatedPayout += amtToMove * (MAX_ALLOCATION - alloc) / MAX_ALLOCATION;
 
         bq.requeue();
+        if ((uint(block.timestamp) * amtToMove) % 2 == 1) {
+            IRewardFlow(rewardedAddr).payForward();
+        }
 
     }
 
@@ -95,7 +106,23 @@ contract RewardFlow is IRewardFlow {
         availableReward += amtToReceive;
     }
 
+    function submitAllocation(address targetAddr, uint allocAmt) public returns (uint queuePosition) {
 
+        require(allocAmt <= MAX_ALLOCATION, "Budget Allocation must be no larger than 1024");
+        if (positions[msg.sender] > 0) {
+            queuePosition = positions[msg.sender];
+        }
+        else {
+            queuePosition = bq.getNextPos();
+            bq.enqueue(msg.sender);
+            positions[msg.sender] = queuePosition;
+        }
+
+        allocations[msg.sender] = Allocation(targetAddr, allocAmt);
+
+        return queuePosition;
+
+    }
 
 
     // function _transfer(address sender, address recipient, uint256 amount) internal virtual {
@@ -112,51 +139,4 @@ contract RewardFlow is IRewardFlow {
 
 }
 
-
-// This queue is meant to approximate proportional allocation, but instead of sending to all 
-// targets, an amount is propagated in round-robin format, so that at most one forwarding 
-// occurs at a time. We can track an overflow value that will be drawn from in the future to 
-// continue sending to each desired address. 
-// The amount to be forwarded will depend on:
-//  * the vouched HONOR of the voting address
-//  * the amount allocated towards the destination address 
-//  * the amount accumulated in the outflow, which grows over time
-//  
-contract BudgetQueue {
-    mapping (uint32 => address) queue;
-    uint32 private first = 1;
-    uint32 private last = 0; 
-
-    constructor() {
-    }
-
-    function enqueue(address newAddress) public {
-        last += 1;
-        queue[last] = newAddress;
-    }
-
-    function dequeue() public returns (address next) {
-        require (first <= last); 
-        next = queue[first];
-        delete queue[first];
-        first += 1;
-    }
-
-    function requeue() public returns (address next) {
-        require (first <= last); 
-        next = queue[first];
-        delete queue[first];
-        first += 1;
-        enqueue(next);
-    }
-
-    function peek() public returns (address next) {
-        require (first <= last); 
-        next = queue[first];
-    }
-
-    function isEmpty() public returns (bool) {
-        return first > last;
-    }
-}
 

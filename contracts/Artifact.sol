@@ -5,6 +5,9 @@ pragma solidity ^0.8.13;
 import "./SafeMath.sol";
 import "../interfaces/IArtifact.sol";
 import "../interfaces/ISTT.sol";
+// import "./Geras.sol";
+// import "../interfaces/IRewardFlow.sol";
+// import "./RewardFlow.sol";
 
 // This contract represents an artifact, which is a desitnation of Honor and has its own 
 // token to represent shares of.
@@ -18,9 +21,9 @@ contract Artifact is IArtifact {
     string public location; 
     address public honorAddr;
     address public builder;
-    uint public antihonorWithin;
+    // uint public antihonorWithin;
     uint public honorWithin;
-    uint public netHonor;
+    // uint public netHonor;
     uint public accHonorHours;
     // uint public totalIncomingRewardFlow;
     uint public builderHonor;
@@ -30,6 +33,7 @@ contract Artifact is IArtifact {
     uint private _totalSupply;
     bool private _isProposed;
     bool private _isRoot;
+    address public rewardFlow;
 
     // uint public constant rewardMult = 1;
 
@@ -55,12 +59,19 @@ contract Artifact is IArtifact {
         _lastUpdated = uint64(block.timestamp);
     }
 
+    // function initializeRF() external returns(address rewardFlow) {
+    //     // rewardFlow = address(new Geras(address(this), address(this)));
+    //     // rewardFlow = address(new RewardFlow(ISTT(honorAddr).getStakedAsset(), address(this), ISTT(honorAddr).getGeras()));
+    //     rewardFlow = address(ISTT(honorAddr).getNewRewardFlow(
+    //         ISTT(honorAddr).getStakedAsset(), address(this), ISTT(honorAddr).getGeras()));
+    // }
+
     /** 
       * Given some input honor to this artifact, return the output vouch amount. 
     */
     function vouch(address account) external override returns(uint vouchAmt) {
         uint totalHonor = ISTT(honorAddr).balanceOf(address(this));
-        uint deposit = SafeMath.sub(totalHonor, honorWithin + antihonorWithin);
+        uint deposit = SafeMath.sub(totalHonor, honorWithin);
 
         // uint honorCbrt = SafeMath.floorCbrt(totalHonor);
         // uint prevHonorCbrt = SafeMath.floorCbrt(honorWithin);
@@ -72,7 +83,7 @@ contract Artifact is IArtifact {
         _mint(account, vouchAmt);
         recomputeBuilderVouch();
         honorWithin += deposit;
-        netHonor += deposit;
+        // netHonor += deposit;
     }
 
 
@@ -98,11 +109,11 @@ contract Artifact is IArtifact {
     // }
 
     function initVouch(address account, uint inputHonor) external returns(uint vouchAmt) {
-        require(msg.sender == honorAddr, "Only used for initial root vouching");
+        require(msg.sender == honorAddr, "Initial");
         vouchAmt = SafeMath.floorSqrt(inputHonor);
         _mint(account, vouchAmt);
         honorWithin += inputHonor;
-        netHonor += inputHonor;
+        // netHonor += inputHonor;
     }
 
     /** 
@@ -110,7 +121,7 @@ contract Artifact is IArtifact {
     */
     function unvouch(address account, address to, uint unvouchAmt) external returns(uint hnrAmt) {
 
-        require(_balances[account] >= unvouchAmt, "Insufficient vouching balance");
+        require(_balances[account] >= unvouchAmt, "Insuff. vouch bal");
         // require(ISTT(honorAddr).balanceOf(to) != 0, "Invalid vouching target");
 
         uint vouchedPost = SafeMath.sub(_totalSupply, unvouchAmt);
@@ -120,7 +131,7 @@ contract Artifact is IArtifact {
         emit Unvouch(account, address(this), hnrAmt, unvouchAmt);
         recomputeBuilderVouch();
         honorWithin -= hnrAmt;
-        netHonor -= hnrAmt;
+        // netHonor -= hnrAmt;
         _burn(account, unvouchAmt);
         _balances[account] -= unvouchAmt;
     }
@@ -175,7 +186,7 @@ contract Artifact is IArtifact {
     function recomputeBuilderVouch() private returns (uint newBuilderVouchAmt) {
         if (_isRoot) { return 0; }
         uint64 timeElapsed = uint64(block.timestamp) - _lastUpdated;
-        uint newHonorHours = (uint(timeElapsed) * netHonor) / 86400;
+        uint newHonorHours = (uint(timeElapsed) * honorWithin) / 86400;
         newBuilderVouchAmt = SafeMath.floorCbrt(accHonorHours + newHonorHours) - SafeMath.floorCbrt(accHonorHours);
         accHonorHours += newHonorHours;
         _lastUpdated = uint64(block.timestamp);
@@ -198,10 +209,13 @@ contract Artifact is IArtifact {
         return honorWithin;
     }
 
-    function getNetHonor() external override view returns(uint) {
-        return honorWithin;
-    }
+    // function getNetHonor() external override view returns(uint) {
+    //     return netHonor;
+    // }
 
+    function getRewardFlow() external override view returns(address) {
+        return rewardFlow;
+    }
 
     function accumulatedHonorHours() external override view returns(uint) {
         return accHonorHours;
@@ -210,6 +224,7 @@ contract Artifact is IArtifact {
     function receiveDonation() external override returns(uint) {
         uint totalHonor = ISTT(honorAddr).balanceOf(address(this));
         honorWithin += SafeMath.sub(totalHonor, honorWithin);
+        // netHonor += SafeMath.sub(totalHonor, honorWithin);
         return honorWithin;
     }
 
@@ -236,10 +251,10 @@ contract Artifact is IArtifact {
     }
 
     function _burn(address account, uint256 amount) internal virtual {
-        require(account != address(0), "ERC20: burn from the zero address");
+        require(account != address(0), "Art: burn from zero");
 
         uint256 accountBalance = _balances[account];
-        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        require(accountBalance >= amount, "Art: burn exceeds bal");
         _balances[account] = accountBalance - amount;
         _totalSupply -= amount;
 

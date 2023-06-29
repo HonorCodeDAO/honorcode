@@ -25,8 +25,8 @@ struct Allocation {
 
 
 contract RewardFlowFactory {
-    function createRewardFlow(address stakedAssetAddr_, address artifactAddr_, address gerasAddr_) public returns(RewardFlow) {
-        return new RewardFlow(stakedAssetAddr_, artifactAddr_, gerasAddr_);
+    function createRewardFlow(address artifactAddr_, address gerasAddr_) public returns(RewardFlow) {
+        return new RewardFlow(artifactAddr_, gerasAddr_);
     }
 }
 
@@ -56,14 +56,15 @@ contract RewardFlow is IRewardFlow {
     uint32 public _lastUpdated;
 
 
-    constructor(address stakedAssetAddr_, address artifactAddr_, address gerasAddr_) {
+    constructor(address artifactAddr_, address gerasAddr_) {
+        // require(IArtifact(artifactAddr).getBuilder() == msg.sender, 'Invalid RF builder');
         artifactAddr = artifactAddr_;
-        stakedAssetAddr = stakedAssetAddr_;
         gerasAddr = gerasAddr_;
+        // stakedAssetAddr = stakedAssetAddr_;
         // Default is to keep all flow to this artifact.
         // budgetFlow[address(this)] = 1 << 32 - 1;
         _lastUpdated = uint32(block.timestamp);
-        // bq = new BudgetQueue();
+        // bq = new BudgetQueue(address(this));
     }
 
     function getArtifact() external override view returns (address) {

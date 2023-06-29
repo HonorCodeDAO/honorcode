@@ -17,8 +17,10 @@ contract BudgetQueue {
     mapping (uint32 => address) queue;
     uint32 private first = 1;
     uint32 private last = 0; 
+    address rewardFlowAddr;
 
-    constructor() {
+    constructor(address rewardFlowAddr_) {
+        rewardFlowAddr = rewardFlowAddr_;
     }
 
     function enqueue(address newAddress) public {
@@ -57,7 +59,7 @@ contract BudgetQueue {
 
 
 contract BudgetQueueFactory {
-    function createBudgetQueue() public returns(BudgetQueue) {
-        return new BudgetQueue();
+    function createBudgetQueue(address rewardFlowAddr_) public returns(BudgetQueue) {
+        return new BudgetQueue(rewardFlowAddr_);
     }
 }

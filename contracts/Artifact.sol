@@ -66,6 +66,15 @@ contract Artifact is IArtifact {
     //         ISTT(honorAddr).getStakedAsset(), address(this), ISTT(honorAddr).getGeras()));
     // }
 
+
+    function initVouch(address account, uint inputHonor) external returns(uint vouchAmt) {
+        require(msg.sender == honorAddr, "Initial");
+        vouchAmt = SafeMath.floorSqrt(inputHonor);
+        _mint(account, vouchAmt);
+        honorWithin += inputHonor;
+        // netHonor += inputHonor;
+    }
+
     /** 
       * Given some input honor to this artifact, return the output vouch amount. 
     */
@@ -108,18 +117,11 @@ contract Artifact is IArtifact {
 
     // }
 
-    function initVouch(address account, uint inputHonor) external returns(uint vouchAmt) {
-        require(msg.sender == honorAddr, "Initial");
-        vouchAmt = SafeMath.floorSqrt(inputHonor);
-        _mint(account, vouchAmt);
-        honorWithin += inputHonor;
-        // netHonor += inputHonor;
-    }
 
     /** 
       * Given some valid input vouching claim to this artifact, return the output honor. 
     */
-    function unvouch(address account, address to, uint unvouchAmt) external returns(uint hnrAmt) {
+    function unvouch(address account, uint unvouchAmt) external override returns(uint hnrAmt) {
 
         require(_balances[account] >= unvouchAmt, "Insuff. vouch bal");
         // require(ISTT(honorAddr).balanceOf(to) != 0, "Invalid vouching target");

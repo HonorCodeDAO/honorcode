@@ -1,6 +1,7 @@
 const Honor = artifacts.require("Honor");
 const Artifact = artifacts.require("Artifact");
 const RewardFlowFactory = artifacts.require("RewardFlowFactory");
+const RewardFlow = artifacts.require("RewardFlow");
 const Geras = artifacts.require("Geras");
 const { time } = require("@openzeppelin/test-helpers");
 
@@ -34,9 +35,10 @@ contract('RewardFlow', (accounts, deployer) => {
   //   // const HonorEthBalance = (await HonorInstance.getBalanceInEth.call(accounts[0])).toNumber();
   //   assert.equal(HonorEthBalance, 2 * HonorBalance, 'Library function returned unexpected function, linkage may be broken');
   // });
-  it('should vouch correctly', async () => {
+  it('should distribute Geras correctly', async () => {
     const HonorInstance = await Honor.deployed();
     const gerasAddr = await HonorInstance.getGeras.call();
+    let duration = time.duration.seconds(360000);
 
     // const ArtifactInstance = await deployer.deploy(Artifact, accounts[1], HonorInstance.address, 'new artifact');
     // const ArtifactInstance = await Artifact.deployed(accounts[1], HonorInstance.address, 'new artifact');
@@ -87,14 +89,39 @@ contract('RewardFlow', (accounts, deployer) => {
 
 
     const geras = (await HonorInstance.getGeras.call());
+    const GerasInstance = await Geras.at(geras);
     const RewardFlowFactoryInstance = await RewardFlowFactory.deployed();
-    const RewardFlowInstance = await RewardFlowFactoryInstance.createRewardFlow.call(rootAddr, geras);
+    // const RewardFlowInstance = await RewardFlowFactoryInstance.createRewardFlow.call(rootAddr, geras);
+    // const RewardFlowInstanceNew = await RewardFlowFactoryInstance.createRewardFlow.call(newAddr, geras);
+
+    // module.exports = function(deployer) {
+    //   const RewardFlowInstance = await deployer.deploy(RewardFlow, rootAddr, geras);
+    // }
+
+    const RewardFlowInstance = await RewardFlow.new(rootAddr, geras);
+    const RewardFlowInstanceNew = await RewardFlow.new(newAddr, geras);
+
     // beforeEach(async function () {
     //     const RewardFlowInstance = await RewardFlowFactoryInstance.createRewardFlow.call(rootAddr, geras);
     // });
     // console.log(geras);
 
+    const accountTwoStartingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowInstance.address)).toNumber();
+    const alloc = (await RewardFlowInstance.submitAllocation.call(RewardFlowInstanceNew.address, 512)).toNumber();
 
+    (await GerasInstance.stakeAsset(rootAddr, 1000000000000000));
+    const stakedAmt = (await GerasInstance.getStakedAsset.call(rootAddr)).toNumber();
+    // console.log(stakedAmt);
+
+    await time.increase(duration);
+    await GerasInstance.distributeReward(RewardFlowInstance.address);
+
+    let rewardAmt = 1000000000000000 * 32 / 1024 * duration / 31536000;
+
+    const accountTwoEndingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowInstance.address)).toNumber();
+    console.log(accountTwoEndingBalanceGeras);
+    console.log(rewardAmt);
+    assert(accountTwoEndingBalanceGeras == 356736150748);
 
   });
   it('should credit builder correctly', async () => {

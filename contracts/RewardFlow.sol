@@ -64,7 +64,7 @@ contract RewardFlow is IRewardFlow {
         // Default is to keep all flow to this artifact.
         // budgetFlow[address(this)] = 1 << 32 - 1;
         _lastUpdated = uint32(block.timestamp);
-        // bq = new BudgetQueue(address(this));
+        bq = new BudgetQueue(address(this));
     }
 
     function getArtifact() external override view returns (address) {
@@ -74,7 +74,7 @@ contract RewardFlow is IRewardFlow {
     // When called, dequeue the next item, calculate the amount to send, and transfer.
     // Formula is: (H_i/Sum_j(H) * accumulated / F)
     // where F is the constant above, resulting in exponential decay (1 - 1/(F H_i/Sum_j(H))) ^ T. 
-    function payForward() public returns (address rewardedAddr, uint rewardAmt) {
+    function payForward() external returns (address rewardedAddr, uint rewardAmt) {
         // uint addedGeras = ISTT(gerasAddr).balanceOf(this.address) - availableReward - escrowedGeras;
         receiveVSR();
         address rewarderAddr = bq.peek();
@@ -107,9 +107,10 @@ contract RewardFlow is IRewardFlow {
         availableReward += amtToReceive;
     }
 
-    function submitAllocation(address targetAddr, uint allocAmt) public returns (uint queuePosition) {
+    function submitAllocation(address targetAddr, uint allocAmt) external returns (uint queuePosition) {
 
-        require(allocAmt <= MAX_ALLOCATION, "Budget Allocation must be no larger than 1024");
+        require(allocAmt <= MAX_ALLOCATION, "Budget Allocation > 1024");
+        require(IArtifact(artifactAddr).balanceOf(msg.sender) > 0, 'Sender has not vouched');
         if (positions[msg.sender] > 0) {
             queuePosition = positions[msg.sender];
         }

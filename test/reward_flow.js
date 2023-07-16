@@ -106,8 +106,8 @@ contract('RewardFlow', (accounts, deployer) => {
     // });
     // console.log(geras);
 
-    const accountTwoStartingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowInstance.address)).toNumber();
-    const alloc = (await RewardFlowInstance.submitAllocation.call(RewardFlowInstanceNew.address, 512)).toNumber();
+    const artifactTwoStartingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowInstanceNew.address)).toNumber();
+    const alloc = (await RewardFlowInstance.submitAllocation(RewardFlowInstanceNew.address, 512));
 
     (await GerasInstance.stakeAsset(rootAddr, 1000000000000000));
     const stakedAmt = (await GerasInstance.getStakedAsset.call(rootAddr)).toNumber();
@@ -115,13 +115,25 @@ contract('RewardFlow', (accounts, deployer) => {
 
     await time.increase(duration);
     await GerasInstance.distributeReward(RewardFlowInstance.address);
+    const artifactOneStartingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowInstance.address)).toNumber();
+    await RewardFlowInstance.payForward();
+    // await GerasInstance.distributeReward(RewardFlowInstanceNew.address);
 
     let rewardAmt = 1000000000000000 * 32 / 1024 * duration / 31536000;
 
-    const accountTwoEndingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowInstance.address)).toNumber();
-    console.log(accountTwoEndingBalanceGeras);
+    const artifactOneEndingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowInstance.address)).toNumber();
+    const artifactTwoEndingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowInstanceNew.address)).toNumber();
+    console.log(artifactOneEndingBalanceGeras);
+    console.log(artifactTwoEndingBalanceGeras);
     console.log(rewardAmt);
-    assert(accountTwoEndingBalanceGeras == 356736150748);
+    assert(artifactOneStartingBalanceGeras == 356736150748, 'starting root geras Incorrect');
+    assert(artifactOneEndingBalanceGeras == 313054173106, 'ending root geras Incorrect');
+    assert(artifactTwoEndingBalanceGeras == 43681977642, 'new artifact geras Incorrect');
+    await RewardFlowInstance.payForward();
+    const artifactOneFinalBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowInstance.address)).toNumber();
+    console.log(artifactOneFinalBalanceGeras);
+    assert(artifactOneFinalBalanceGeras == 274721009053, 'final root geras Incorrect');
+
 
   });
   it('should credit builder correctly', async () => {

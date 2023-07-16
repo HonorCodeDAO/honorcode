@@ -80,12 +80,14 @@ contract RewardFlow is IRewardFlow {
         address rewarderAddr = bq.peek();
         IArtifact artifact_ = IArtifact(artifactAddr);
         uint nextV = artifact_.balanceOf(rewarderAddr);
-        if (nextV == 0) {
+
+        if (nextV == 0 || allocations[rewarderAddr].amount == 0) {
             bq.dequeue();
             return (rewarderAddr, 0);
         }
-        rewardedAddr = allocations[rewardedAddr].target; 
-        uint alloc = allocations[rewardedAddr].amount;
+        rewardedAddr = allocations[rewarderAddr].target; 
+        uint alloc = allocations[rewarderAddr].amount;
+
         // uint32 timeElapsed = uint32(block.timestamp) - _lastUpdated;
         // uint amtToMove = SafeMath.max(availableReward, availableReward * timeElapsed / RATE_TO_ACCRUE);
 

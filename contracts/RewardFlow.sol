@@ -123,6 +123,7 @@ contract RewardFlow is IRewardFlow {
         }
 
         allocations[msg.sender] = Allocation(targetAddr, allocAmt);
+        emit Allocate(msg.sender, targetAddr, allocAmt);
 
         return queuePosition;
 

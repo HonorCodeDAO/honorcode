@@ -7,6 +7,7 @@ interface IRewardFlow {
     function payForward() external returns(address, uint);
     // function receiveVSR() external returns (uint);
     function submitAllocation(address targetAddr, uint allocAmt) external returns(uint);
-    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Allocate(address indexed from, address indexed to, uint256 value);
+    event Distribute(address indexed from, address indexed to, uint256 value);
 
 }

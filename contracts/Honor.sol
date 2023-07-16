@@ -26,6 +26,7 @@ contract Honor is ISTT {
     address public stakedAssetAddr = address(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
     address public gerasAddr;
     address public rewardFlow;
+    // address public owner;
     uint private _totalSupply;
     uint constant VALIDATE_AMT = 1;
     // uint32 constant public INFLATION_PER_THOUSAND_PER_YEAR_STAKER = 500;
@@ -52,6 +53,7 @@ contract Honor is ISTT {
         IArtifact(rootArtifact).initVouch(msg.sender, 10000);
         _balances[rootArtifact] = 10000;
         IArtifact(rootArtifact).setRoot();
+        // owner = msg.sender;
     }
 
     function initializeRF() external returns(address) {
@@ -183,6 +185,7 @@ contract Honor is ISTT {
 
 contract Geras is IGeras {
     mapping (address => uint) private _balances;
+    // mapping (address => uint) private _claims;
     mapping (address => uint) private _stakedAsset;
     mapping (address => uint) private _stakedAssetBalances;
     // mapping (address => ArtifactData.data) artifacts;
@@ -191,6 +194,9 @@ contract Geras is IGeras {
     address public stakedAssetAddr = address(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
     uint public totalVirtualStakedAsset;
     uint public totalVirtualStakedReward;
+    // uint public claimableReward;
+    // Percentage of 1024
+    // uint public claimableConversionRate = 128;
     uint private _totalSupply;
     uint32 private _lastUpdated;
 
@@ -242,7 +248,7 @@ contract Geras is IGeras {
         IERC20(stakedAssetAddr).transfer(msg.sender, amount);
     }
 
-    function distributeReward(address rewardFlowAddr) public {
+    function distributeGeras(address rewardFlowAddr) public {
         // For now, only root artifact can generate Geras.
         require(IRewardFlow(rewardFlowAddr).getArtifact() == rootArtifact, 'Only stake with root artifact');
         uint32 timeElapsed = uint32(block.timestamp) - _lastUpdated;
@@ -252,6 +258,23 @@ contract Geras is IGeras {
         _mint(rewardFlowAddr, timeElapsed * newGeras / 31536000); 
         // IRewardFlow(rewardFlowAddr).payForward();
     }
+
+    // function distributeReward(uint amountToDistribute) public {
+    //     // For now, only owner can distribute the staked asset for Geras.
+    //     require(msg.sender == ISTT(honorAddr).owner, 'Only owner can distributeReward');
+    //     require(amountToDistribute <= IERC20(stakedAssetAddr).balanceOf(address(this)));
+    //     claimableReward += amountToDistribute;
+    //     // IRewardFlow(rewardFlowAddr).payForward();
+    // }
+
+
+    // function claimReward(uint amountToDistribute) public {
+    //     // Burn some of the address's geras claims.
+    //     require(msg.sender == ISTT(honorAddr).owner, 'Only owner can distributeReward');
+    //     require(amountToDistribute <= IERC20(stakedAssetAddr).balanceOf(address(this)));
+    //     claimableReward += amountToDistribute;
+    //     // IRewardFlow(rewardFlowAddr).payForward();
+    // }
 
     function transfer(address sender, address recipient, uint256 amount) public virtual {
         // require(sender != address(0), "GERAS: transfer from the zero address");

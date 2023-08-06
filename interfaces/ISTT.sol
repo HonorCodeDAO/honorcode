@@ -9,5 +9,7 @@ interface ISTT {
     // function getNewRewardFlow(address stakedAssetAddr_, address artifactAddr_, address gerasAddr_) external returns(address);
     function getGeras() external view returns(address);
     function getStakedAsset() external view returns(address);
+    function getRootArtifact() external view returns(address);
+
 
 }

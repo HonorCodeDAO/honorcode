@@ -32,22 +32,20 @@ contract Artifact is IArtifact {
     uint64 private _lastUpdated;
     uint private _totalSupply;
     bool private _isProposed;
-    bool private _isRoot;
     address public rewardFlow;
 
     // uint public constant rewardMult = 1;
 
-    // Where are the incoming rewards coming from? These sum to the total flow. 
-    // mapping (address => uint) incomeFlow;
-    // Where do the incoming rewards flow? 
-    // mapping (address => uint) budgetFlow;
-    // Where is everybody voting for these rewards to flow? The aggregate value 
-    // above will be calculated from a sum weighted (by vouch size) of individual submitted budgets. 
-    // If not set, will default to status quo. 
     // mapping (address => mapping (address => uint)) budgets;
 
     mapping (address => uint) private _balances;
     // mapping (address => uint) private _staked;
+
+    // These mappings are necessary to track the relative share of each claim.
+    // The reward flows are time-weighted, so they need to be synced together.
+    mapping (address => uint) private _accRewardClaims;
+    mapping (address => uint) private _lastUpdatedVouch;
+
 
     constructor(address builderAddr, address honorAddress, string memory artifactLoc) {
         builder = builderAddr;
@@ -57,6 +55,8 @@ contract Artifact is IArtifact {
         // Default is to keep all flow to this artifact.
         // budgetFlow[address(this)] = 1 << 32 - 1;
         _lastUpdated = uint64(block.timestamp);
+        _accRewardClaims[address(this)] = 0;
+        _lastUpdatedVouch[address(this)] = uint64(block.timestamp);
     }
 
     // function initializeRF() external returns(address rewardFlow) {
@@ -68,11 +68,30 @@ contract Artifact is IArtifact {
 
 
     function initVouch(address account, uint inputHonor) external returns(uint vouchAmt) {
-        require(msg.sender == honorAddr, "Initial");
+        // require(msg.sender == honorAddr, "Initial");
         vouchAmt = SafeMath.floorSqrt(inputHonor);
         _mint(account, vouchAmt);
         honorWithin += inputHonor;
         // netHonor += inputHonor;
+    }
+
+
+    function updateAccumulated(address voucher) private returns (uint256 acc) {
+
+        _accRewardClaims[address(this)] += _totalSupply * (
+            _lastUpdatedVouch[address(this)] - uint64(block.timestamp));
+        _lastUpdatedVouch[address(this)] = uint64(block.timestamp);
+        if (voucher == address(this)) { 
+            acc = _accRewardClaims[address(this)];
+            return acc;
+        }
+        if (balanceOf(voucher) == 0) {
+            return 0;
+        }
+        _accRewardClaims[voucher] += balanceOf(voucher) * (
+            _lastUpdatedVouch[voucher] - uint64(block.timestamp));
+        _lastUpdatedVouch[voucher] = uint64(block.timestamp);
+        acc = _accRewardClaims[voucher];
     }
 
     /** 
@@ -85,6 +104,7 @@ contract Artifact is IArtifact {
         // uint honorCbrt = SafeMath.floorCbrt(totalHonor);
         // uint prevHonorCbrt = SafeMath.floorCbrt(honorWithin);
         // vouchAmt = SafeMath.sub(honorCbrt * honorCbrt, prevHonorCbrt * prevHonorCbrt);
+        // updateAccumulated(account);
 
         vouchAmt = SafeMath.sub(SafeMath.floorSqrt(totalHonor), SafeMath.floorSqrt(honorWithin));
 
@@ -125,7 +145,7 @@ contract Artifact is IArtifact {
 
         require(_balances[account] >= unvouchAmt, "Insuff. vouch bal");
         // require(ISTT(honorAddr).balanceOf(to) != 0, "Invalid vouching target");
-
+        // updateAccumulated(account);
         uint vouchedPost = SafeMath.sub(_totalSupply, unvouchAmt);
 
         hnrAmt = SafeMath.sub(_totalSupply ** 2, vouchedPost ** 2);
@@ -133,9 +153,9 @@ contract Artifact is IArtifact {
         emit Unvouch(account, address(this), hnrAmt, unvouchAmt);
         recomputeBuilderVouch();
         honorWithin -= hnrAmt;
-        // netHonor -= hnrAmt;
         _burn(account, unvouchAmt);
-        _balances[account] -= unvouchAmt;
+        // _balances[account] -= unvouchAmt;
+        // // netHonor -= hnrAmt;
     }
 
     /** 
@@ -186,7 +206,9 @@ contract Artifact is IArtifact {
      * The amount of the vouch claim going to the builder will increase based on the vouched HONOR over time. 
      */
     function recomputeBuilderVouch() private returns (uint newBuilderVouchAmt) {
-        if (_isRoot) { return 0; }
+        if (ISTT(honorAddr).getRootArtifact() == address(this)) { 
+            return 0; 
+        }
         uint64 timeElapsed = uint64(block.timestamp) - _lastUpdated;
         uint newHonorHours = (uint(timeElapsed) * honorWithin) / 86400;
         newBuilderVouchAmt = SafeMath.floorCbrt(accHonorHours + newHonorHours) - SafeMath.floorCbrt(accHonorHours);
@@ -200,6 +222,9 @@ contract Artifact is IArtifact {
     }
 
     function balanceOf(address addr) public view returns(uint) {
+        // if (addr==address(this)) {
+        //     return _balances[msg.sender];
+        // }
         return _balances[addr];
     }
 
@@ -209,6 +234,10 @@ contract Artifact is IArtifact {
 
     function getInternalHonor() external override view returns(uint) {
         return honorWithin;
+    }
+
+    function getHonorAddr() external override view returns(address) {
+        return honorAddr;
     }
 
     // function getNetHonor() external override view returns(uint) {
@@ -224,8 +253,7 @@ contract Artifact is IArtifact {
     }
 
     function receiveDonation() external override returns(uint) {
-        uint totalHonor = ISTT(honorAddr).balanceOf(address(this));
-        honorWithin += SafeMath.sub(totalHonor, honorWithin);
+        honorWithin += SafeMath.sub(ISTT(honorAddr).balanceOf(address(this)), honorWithin);
         // netHonor += SafeMath.sub(totalHonor, honorWithin);
         return honorWithin;
     }
@@ -234,17 +262,12 @@ contract Artifact is IArtifact {
         return !_isProposed;
     }
 
-    function setRoot() external override returns(bool) {
-        require(msg.sender == honorAddr);
-        _isRoot = true;
-        return _isRoot;
-    }
-
     function validate() external override returns(bool) {
-        require(msg.sender == honorAddr);
+        require(msg.sender == honorAddr, 'Invalid validation source');
         _isProposed = false;
         return !_isProposed;
     }
+
 
     function _mint(address account, uint256 amount) internal virtual {
         _totalSupply += amount;

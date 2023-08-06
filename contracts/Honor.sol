@@ -2,7 +2,7 @@
 // Tells the Solidity compiler to compile only from v0.8.13 to v0.9.0
 pragma solidity ^0.8.13;
 
-import "./Artifactory.sol";
+import "../interfaces/IArtifactory.sol";
 // import "./Geras.sol";
 // import "./RewardFlow.sol";
 import "../interfaces/IArtifact.sol";
@@ -18,8 +18,8 @@ import "../interfaces/IRewardFlow.sol";
 
 contract Honor is ISTT {
     mapping (address => uint) private _balances;
-    mapping (address => uint) private _stakedAsset;
-    mapping (address => uint) private _accStakingRewards;
+    // mapping (address => uint) private _stakedAsset;
+    // mapping (address => uint) private _accStakingRewards;
     mapping (address => uint32) private _lastUpdated;
     // mapping (address => ArtifactData.data) artifacts;
     address public rootArtifact;
@@ -32,27 +32,26 @@ contract Honor is ISTT {
     // uint32 constant public INFLATION_PER_THOUSAND_PER_YEAR_STAKER = 500;
     // uint32 constant public INFLATION_PER_THOUSAND_PER_YEAR_VOUCHER = 500;
     uint32 constant public EXPECTED_REWARD_PER_YEAR_PER_THOUSAND_STAKED = 32;
-    address public latestProposed;
-    Artifactory afact;
+    // address public latestProposed;
+    address public artifactoryAddr;
     // RewardFlowFactory rfFact;
     // GerasFactory gFact;
 
 
-    constructor() {
-        afact = new Artifactory();
+    constructor(address artifactoryAddress) {
+        artifactoryAddr = artifactoryAddress;
         // rfFact = new RewardFlowFactory();
         // gFact = new GerasFactory();
         // Artifact root = new Artifact(tx.origin, address(this), "rootArtifact");
-        rootArtifact = address(afact.createArtifact(tx.origin, address(this), "rootArtifact"));
+        rootArtifact = (IArtifactory(artifactoryAddr).createArtifact(tx.origin, address(this), "rootArtifact"));
         // gerasAddr = address(gFact.createGeras(rootArtifact, address(this)));
         gerasAddr = address(new Geras(rootArtifact, address(this)));
 
         _mint(rootArtifact, 10000);
         // IArtifact(rootArtifact).vouch(tx.origin);
-        require(_balances[rootArtifact] > 0, "root balance 0");
+        // require(_balances[rootArtifact] > 0, "root balance 0");
         IArtifact(rootArtifact).initVouch(msg.sender, 10000);
         _balances[rootArtifact] = 10000;
-        IArtifact(rootArtifact).setRoot();
         // owner = msg.sender;
     }
 
@@ -104,10 +103,10 @@ contract Honor is ISTT {
         return gerasAddr; 
     }
 
-    function updateStakingRewards(address addr) public returns (uint newRewards) { 
-        newRewards = uint(block.timestamp - _lastUpdated[addr]) * _stakedAsset[addr];
-        _accStakingRewards[addr] += newRewards; 
-    }
+    // function updateStakingRewards(address addr) public returns (uint newRewards) { 
+    //     newRewards = uint(block.timestamp - _lastUpdated[addr]) * _stakedAsset[addr];
+    //     _accStakingRewards[addr] += newRewards; 
+    // }
 
     /* 
      * The presiding HONOR contract will manage housekeeping between the available artifacts. 
@@ -117,14 +116,15 @@ contract Honor is ISTT {
     function vouch(address _from, address _to, uint amount) public returns(uint revouchAmt) {
         require(_balances[_to] != 0 && _balances[_from] != 0 && IArtifact(_to).isValidated(), 
             "Inval vouch");
-        require(IArtifact(_from).balanceOf(tx.origin) >= amount, "Insuff. vouch bal");
+        require(IArtifact(_from).balanceOf(msg.sender) >= amount, "Insuff. vouch bal");
 
-        uint hnrAmt = IArtifact(_from).unvouch(tx.origin, amount);
+        uint hnrAmt = IArtifact(_from).unvouch(msg.sender, amount);
         _transfer(_from, _to, hnrAmt);
 
-        revouchAmt = IArtifact(_to).vouch(tx.origin); 
+        require(IArtifact(_from).getHonorAddr() == address(this), 'artifact doesnt exist');
+        revouchAmt = IArtifact(_to).vouch(msg.sender); 
 
-        emit Vouch(tx.origin, _from, _to, hnrAmt);
+        emit Vouch(msg.sender, _from, _to, hnrAmt);
     }
 
     /* 
@@ -132,16 +132,15 @@ contract Honor is ISTT {
      */ 
     function proposeArtifact(address _from, address builder, string memory location) public returns(address proposedAddr) { 
 
-        // Artifact newArtifact = new Artifact(builder, address(this), location); 
-        // Artifact newArtifact = afact.createArtifact(builder, address(this), location);
-        proposedAddr = address(afact.createArtifact(builder, address(this), location));
-
         require(IArtifact(_from).balanceOf(msg.sender) >= VALIDATE_AMT, "Insuff. proposer bal");
+        proposedAddr = (IArtifactory(artifactoryAddr).createArtifact(builder, address(this), location));
 
         uint hnrAmt = IArtifact(_from).unvouch(msg.sender, VALIDATE_AMT);
+        // uint hnrAmt = 1;
         _transfer(_from, proposedAddr, hnrAmt);
         IArtifact(proposedAddr).receiveDonation();
-        latestProposed = proposedAddr;
+        IArtifact(proposedAddr).validate();
+        // latestProposed = proposedAddr;
     }
 
     /* 
@@ -158,7 +157,7 @@ contract Honor is ISTT {
         uint hnrAmt = IArtifact(_from).unvouch(msg.sender, VALIDATE_AMT);
         _transfer(_from, addr, hnrAmt);
         IArtifact(addr).receiveDonation();
-        return IArtifact(_from).validate();
+        return IArtifact(addr).validate();
     }
 
     function _mint(address account, uint256 amount) internal virtual {
@@ -172,7 +171,7 @@ contract Honor is ISTT {
     function _transfer(address sender, address recipient, uint256 amount) internal virtual {
         // require(sender != address(0), "HONOR: tfer from zero");
         // require(recipient != address(0), "HONOR: tfer to zero");
-        require(IArtifact(recipient).isValidated());
+        // require(IArtifact(recipient).isValidated(), 'recipient not validated');
 
         uint256 senderBalance = _balances[sender];
         require(senderBalance >= amount, "HONOR: tfer exceeds bal");

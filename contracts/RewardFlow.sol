@@ -31,6 +31,14 @@ contract RewardFlowFactory {
 }
 
 contract RewardFlow is IRewardFlow {
+    
+    // Where are the incoming rewards coming from? These sum to the total flow. 
+    // mapping (address => uint) incomeFlow;
+    // Where do the incoming rewards flow? 
+    // mapping (address => uint) budgetFlow;
+    // Where is everybody voting for these rewards to flow? The aggregate value 
+    // above will be calculated from a sum weighted (by vouch size) of individual submitted budgets. 
+    // If not set, will default to status quo. 
     mapping (address => Allocation) allocations;
     mapping (address => uint) positions; 
 
@@ -124,9 +132,6 @@ contract RewardFlow is IRewardFlow {
 
         allocations[msg.sender] = Allocation(targetAddr, allocAmt);
         emit Allocate(msg.sender, targetAddr, allocAmt);
-
-        return queuePosition;
-
     }
 
 

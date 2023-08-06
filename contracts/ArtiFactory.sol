@@ -3,10 +3,17 @@
 pragma solidity ^0.8.13;
 
 import "./Artifact.sol";
-import "../interfaces/IArtifact.sol";
+import "../interfaces/IArtifactory.sol";
 
-contract Artifactory {
-    function createArtifact(address builderAddr, address honorAddress, string memory artifactLoc) public returns(Artifact) {
-        return new Artifact(builderAddr, honorAddress, artifactLoc);
+
+contract Artifactory is IArtifactory {
+    address private owner;
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function createArtifact(address builderAddr, address honorAddr, string memory artifactLoc) public override returns(address) {
+        // require(owner==msg.sender, 'Only honorAddress can createArtifact');
+        return address(new Artifact(builderAddr, honorAddr, artifactLoc));
     }
 }

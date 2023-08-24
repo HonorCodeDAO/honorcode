@@ -44,7 +44,7 @@ contract BudgetQueue {
     }
 
     function peek() public view returns (address) {
-        require (first <= last); 
+        require (first <= last, 'budget queue is empty'); 
         return queue[first];
     }
 

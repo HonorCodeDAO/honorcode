@@ -29,7 +29,7 @@ contract Artifact is IArtifact {
     uint public builderHonor;
     // uint public accReward;
     // uint public virtualStaked;
-    uint64 private _lastUpdated;
+    uint32 private _lastUpdated;
     uint private _totalSupply;
     bool private _isProposed;
     address public rewardFlow;
@@ -54,9 +54,9 @@ contract Artifact is IArtifact {
         _balances[tx.origin] = 0;
         // Default is to keep all flow to this artifact.
         // budgetFlow[address(this)] = 1 << 32 - 1;
-        _lastUpdated = uint64(block.timestamp);
+        _lastUpdated = uint32(block.timestamp);
         _accRewardClaims[address(this)] = 0;
-        _lastUpdatedVouch[address(this)] = uint64(block.timestamp);
+        _lastUpdatedVouch[address(this)] = uint32(block.timestamp);
     }
 
     // function initializeRF() external returns(address rewardFlow) {
@@ -76,22 +76,29 @@ contract Artifact is IArtifact {
     }
 
 
-    function updateAccumulated(address voucher) private returns (uint256 acc) {
+    function updateAccumulated(address voucher) private returns (uint256) {
 
         _accRewardClaims[address(this)] += _totalSupply * (
-            _lastUpdatedVouch[address(this)] - uint64(block.timestamp));
-        _lastUpdatedVouch[address(this)] = uint64(block.timestamp);
-        if (voucher == address(this)) { 
-            acc = _accRewardClaims[address(this)];
-            return acc;
+            uint32(block.timestamp) - _lastUpdatedVouch[address(this)]);
+        _lastUpdatedVouch[address(this)] = uint32(block.timestamp);
+        if (voucher == address(this)) { return _accRewardClaims[address(this)];
         }
         if (balanceOf(voucher) == 0) {
             return 0;
         }
         _accRewardClaims[voucher] += balanceOf(voucher) * (
-            _lastUpdatedVouch[voucher] - uint64(block.timestamp));
-        _lastUpdatedVouch[voucher] = uint64(block.timestamp);
-        acc = _accRewardClaims[voucher];
+            uint32(block.timestamp) - _lastUpdatedVouch[voucher]);
+        _lastUpdatedVouch[voucher] = uint32(block.timestamp);
+        return _accRewardClaims[voucher];
+    }
+
+    function redeemRewardClaim(address voucher, uint256 redeemAmt) private returns (uint256 totalClaim) {
+        require(msg.sender == rewardFlow);
+        require(_accRewardClaims[voucher] >= redeemAmt, 'amount unavailable to redeem');
+        totalClaim = _accRewardClaims[address(this)]; 
+        _accRewardClaims[voucher] = _accRewardClaims[voucher] - redeemAmt;
+        _accRewardClaims[address(this)] = _accRewardClaims[address(this)] - redeemAmt;
+        // remainingClaim = _accRewardClaims[voucher];
     }
 
     /** 
@@ -104,7 +111,8 @@ contract Artifact is IArtifact {
         // uint honorCbrt = SafeMath.floorCbrt(totalHonor);
         // uint prevHonorCbrt = SafeMath.floorCbrt(honorWithin);
         // vouchAmt = SafeMath.sub(honorCbrt * honorCbrt, prevHonorCbrt * prevHonorCbrt);
-        // updateAccumulated(account);
+        updateAccumulated(account);
+        updateAccumulated(address(this));
 
         vouchAmt = SafeMath.sub(SafeMath.floorSqrt(totalHonor), SafeMath.floorSqrt(honorWithin));
 
@@ -145,7 +153,8 @@ contract Artifact is IArtifact {
 
         require(_balances[account] >= unvouchAmt, "Insuff. vouch bal");
         // require(ISTT(honorAddr).balanceOf(to) != 0, "Invalid vouching target");
-        // updateAccumulated(account);
+        updateAccumulated(address(this));
+        updateAccumulated(account);
         uint vouchedPost = SafeMath.sub(_totalSupply, unvouchAmt);
 
         hnrAmt = SafeMath.sub(_totalSupply ** 2, vouchedPost ** 2);
@@ -209,11 +218,11 @@ contract Artifact is IArtifact {
         if (ISTT(honorAddr).getRootArtifact() == address(this)) { 
             return 0; 
         }
-        uint64 timeElapsed = uint64(block.timestamp) - _lastUpdated;
+        uint64 timeElapsed = uint32(block.timestamp) - _lastUpdated;
         uint newHonorHours = (uint(timeElapsed) * honorWithin) / 86400;
         newBuilderVouchAmt = SafeMath.floorCbrt(accHonorHours + newHonorHours) - SafeMath.floorCbrt(accHonorHours);
         accHonorHours += newHonorHours;
-        _lastUpdated = uint64(block.timestamp);
+        _lastUpdated = uint32(block.timestamp);
         if (newBuilderVouchAmt <= 0) {
             return newBuilderVouchAmt;
         }
@@ -246,6 +255,11 @@ contract Artifact is IArtifact {
 
     function getRewardFlow() external override view returns(address) {
         return rewardFlow;
+    }
+
+    function setRewardFlow() external returns(address) {
+        require(rewardFlow == address(0));
+        rewardFlow = msg.sender;
     }
 
     function accumulatedHonorHours() external override view returns(uint) {

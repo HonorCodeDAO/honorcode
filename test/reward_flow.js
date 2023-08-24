@@ -96,45 +96,57 @@ contract('RewardFlow', (accounts, deployer) => {
     const geras = (await HonorInstance.getGeras.call());
     const GerasInstance = await Geras.at(geras);
     const RewardFlowFactoryInstance = await RewardFlowFactory.deployed();
-    // const RewardFlowInstance = await RewardFlowFactoryInstance.createRewardFlow.call(rootAddr, geras);
-    // const RewardFlowInstanceNew = await RewardFlowFactoryInstance.createRewardFlow.call(newAddr, geras);
+    const RewardFlowAddr = await RewardFlowFactoryInstance.createRewardFlow.call(rootAddr, geras);
+    await RewardFlowFactoryInstance.createRewardFlow(rootAddr, geras);
+    const RewardFlowAddrNew = await RewardFlowFactoryInstance.createRewardFlow.call(newAddr, geras);
+    await RewardFlowFactoryInstance.createRewardFlow(newAddr, geras);
 
     // module.exports = function(deployer) {
     //   const RewardFlowInstance = await deployer.deploy(RewardFlow, rootAddr, geras);
     // }
 
-    const RewardFlowInstance = await RewardFlow.new(rootAddr, geras);
-    const RewardFlowInstanceNew = await RewardFlow.new(newAddr, geras);
+    const RewardFlowInstance = await RewardFlow.at(RewardFlowAddr);
+    const RewardFlowInstanceNew = await RewardFlow.at(RewardFlowAddrNew);
 
     // beforeEach(async function () {
     //     const RewardFlowInstance = await RewardFlowFactoryInstance.createRewardFlow.call(rootAddr, geras);
     // });
     // console.log(geras);
 
-    const artifactTwoStartingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowInstanceNew.address)).toNumber();
-    const alloc = (await RewardFlowInstance.submitAllocation(RewardFlowInstanceNew.address, 512));
+    const artifactTwoStartingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowAddr)).toNumber();
+    const alloc = (await RewardFlowInstance.submitAllocation(RewardFlowAddrNew, 512));
+    // const newAlloc = (await RewardFlowInstance.submitAllocation(RewardFlowInstanceNew.address, 128));
 
     (await GerasInstance.stakeAsset(rootAddr, 1000000000000000));
     const stakedAmt = (await GerasInstance.getStakedAsset.call(rootAddr)).toNumber();
     // console.log(stakedAmt);
 
     await time.increase(duration);
-    await GerasInstance.distributeGeras(RewardFlowInstance.address);
-    const artifactOneStartingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowInstance.address)).toNumber();
+    await GerasInstance.distributeGeras(RewardFlowAddr);
+    const artifactOneStartingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowAddr)).toNumber();
     await RewardFlowInstance.payForward();
     // await GerasInstance.distributeReward(RewardFlowInstanceNew.address);
 
     let rewardAmt = 1000000000000000 * 32 / 1024 * duration / 31536000;
 
-    const artifactOneEndingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowInstance.address)).toNumber();
-    const artifactTwoEndingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowInstanceNew.address)).toNumber();
-    console.log(artifactOneStartingBalanceGeras);
+    const artifactOneEndingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowAddr)).toNumber();
+    const artifactTwoEndingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowAddrNew)).toNumber();
+    console.log(artifactOneStartingBalanceGeras); // 356735159817
     console.log(artifactOneEndingBalanceGeras);
     console.log(artifactTwoEndingBalanceGeras);
     console.log(rewardAmt);
-    // assert(artifactOneStartingBalanceGeras == 356736150748, 'starting root geras Incorrect');
-    // assert(artifactOneEndingBalanceGeras == 313054173106, 'ending root geras Incorrect');
-    // assert(artifactTwoEndingBalanceGeras == 43681977642, 'new artifact geras Incorrect');
+
+    // it("Check that self reward reverts.", async () =>{
+    //     try{
+    //       const selfAlloc = (await RewardFlowInstance.submitAllocation(RewardFlowInstance.address, 128));
+    //     }
+    //     catch{return;}
+    //     assert.fail("Self reward does not revert.");
+    // });
+
+    assert(artifactOneStartingBalanceGeras == Math.floor(rewardAmt), 'starting root geras Incorrect');
+    assert(artifactOneEndingBalanceGeras == 312143264840, 'ending root geras Incorrect');
+    assert(artifactTwoEndingBalanceGeras == Math.floor(rewardAmt) - 312143264840, 'new artifact geras Incorrect');
     // await RewardFlowInstance.payForward();
     // const artifactOneFinalBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowInstance.address)).toNumber();
     // console.log(artifactOneFinalBalanceGeras);
@@ -168,6 +180,9 @@ contract('RewardFlow', (accounts, deployer) => {
     const rootAddr = await HonorInstance.getRootArtifact.call();
     const rootBalance = await HonorInstance.balanceOf.call(rootAddr);
     const newAddr = await HonorInstance.proposeArtifact.call(rootAddr, builderTwo, 'new artifact');
+    const geras = (await HonorInstance.getGeras.call());
+    const GerasInstance = await Geras.at(geras);
+
     await HonorInstance.proposeArtifact(rootAddr, builderTwo, 'new artifact');
     
     // await HonorInstance.validateArtifact(rootAddr, newAddr);
@@ -181,6 +196,29 @@ contract('RewardFlow', (accounts, deployer) => {
     const builderStartingBalance = (await HonorInstance.balanceOfArtifact.call(newAddr, builderTwo)).toNumber();
     // advanceTime(36000);
     // console.log((await HonorInstance.getArtifactAccumulatedHonorHours.call(newAddr)).toNumber());
+
+    const RewardFlowFactoryInstance = await RewardFlowFactory.deployed();
+    const RewardFlowAddr = await RewardFlowFactoryInstance.createRewardFlow.call(rootAddr, geras);
+    await RewardFlowFactoryInstance.createRewardFlow(rootAddr, geras);
+    const RewardFlowAddrNew = await RewardFlowFactoryInstance.createRewardFlow.call(newAddr, geras);
+    await RewardFlowFactoryInstance.createRewardFlow(newAddr, geras);
+
+
+    console.log(RewardFlowAddr);
+    console.log(RewardFlowAddrNew);
+
+    const RewardFlowInstance = await RewardFlow.at(RewardFlowAddr);
+    const RewardFlowInstanceNew = await RewardFlow.at(RewardFlowAddrNew);
+
+
+    const artifactTwoStartingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowInstanceNew.address)).toNumber();
+    const alloc = (await RewardFlowInstance.submitAllocation(RewardFlowInstanceNew.address, 256));
+    // const newAlloc = (await RewardFlowInstance.submitAllocation(RewardFlowInstanceNew.address, 128));
+
+    (await GerasInstance.stakeAsset(rootAddr, 1000000000000000));
+    const stakedAmt = (await GerasInstance.getStakedAsset.call(rootAddr)).toNumber();
+
+
     await time.increase(duration);
     await HonorInstance.vouch(rootAddr, newAddr, 1);
     // console.log((await HonorInstance.getArtifactAccumulatedHonorHours.call(newAddr)).toNumber());
@@ -189,6 +227,9 @@ contract('RewardFlow', (accounts, deployer) => {
 
     const expectedBuilderChange = 20;
     assert.equal(builderEndingBalance, builderStartingBalance + expectedBuilderChange, "Incorrect change for builder");
+
+
+
 
   });
   // it("get the size of the contract", function() {

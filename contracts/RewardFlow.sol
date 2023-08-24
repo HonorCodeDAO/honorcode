@@ -25,13 +25,20 @@ struct Allocation {
 
 
 contract RewardFlowFactory {
-    function createRewardFlow(address artifactAddr_, address gerasAddr_) public returns(RewardFlow) {
-        return new RewardFlow(artifactAddr_, gerasAddr_);
+    mapping (address => address) artifactToRF;
+
+    function createRewardFlow(address artifactAddr_, address gerasAddr_) public returns(address) {
+        require(artifactToRF[artifactAddr_] == address(0), 'RewardFlow for artifact exists');
+        artifactToRF[artifactAddr_] = address(new RewardFlow(artifactAddr_, gerasAddr_));
+        require(artifactToRF[artifactToRF[artifactAddr_]] == address(0), 'Artifact for RewardFlow exists');
+
+        artifactToRF[artifactToRF[artifactAddr_]] = artifactAddr_;
+        return artifactToRF[artifactAddr_];
     }
 }
 
 contract RewardFlow is IRewardFlow {
-    
+
     // Where are the incoming rewards coming from? These sum to the total flow. 
     // mapping (address => uint) incomeFlow;
     // Where do the incoming rewards flow? 
@@ -66,6 +73,10 @@ contract RewardFlow is IRewardFlow {
 
     constructor(address artifactAddr_, address gerasAddr_) {
         // require(IArtifact(artifactAddr).getBuilder() == msg.sender, 'Invalid RF builder');
+        // require(IArtifact(artifactAddr).getRewardFlow() == address(0));
+
+
+        // IArtifact(artifactAddr).setRewardFlow();
         artifactAddr = artifactAddr_;
         gerasAddr = gerasAddr_;
         // stakedAssetAddr = stakedAssetAddr_;
@@ -85,6 +96,7 @@ contract RewardFlow is IRewardFlow {
     function payForward() external returns (address rewardedAddr, uint rewardAmt) {
         // uint addedGeras = ISTT(gerasAddr).balanceOf(this.address) - availableReward - escrowedGeras;
         receiveVSR();
+        if (bq.isEmpty()) { return (address(this), 0);}
         address rewarderAddr = bq.peek();
         IArtifact artifact_ = IArtifact(artifactAddr);
         uint nextV = artifact_.balanceOf(rewarderAddr);
@@ -119,8 +131,11 @@ contract RewardFlow is IRewardFlow {
 
     function submitAllocation(address targetAddr, uint allocAmt) external returns (uint queuePosition) {
 
-        require(allocAmt <= MAX_ALLOCATION, "Budget Allocation > 1024");
+        require(allocAmt <= MAX_ALLOCATION, 'Budget Allocation > 1024');
         require(IArtifact(artifactAddr).balanceOf(msg.sender) > 0, 'Sender has not vouched');
+        require(address(this) != targetAddr, 'Artifact self-reward not allowed');
+        // require(artifactToRF[targetAddr], 'RewardFlow not found');
+
         if (positions[msg.sender] > 0) {
             queuePosition = positions[msg.sender];
         }
@@ -134,6 +149,15 @@ contract RewardFlow is IRewardFlow {
         emit Allocate(msg.sender, targetAddr, allocAmt);
     }
 
+    // function redeemReward(address claimer, uint redeemAmt) external returns (uint gerasAmt) {
+
+        // uint totalClaim = IArtifact(artifactAddr).redeemRewardClaim(address claimer, redeemAmt);
+    //     uint gerasAmt = IGeras(gerasAddr).balanceOf(address(this)) * redeemAmt / totalClaim;
+
+    //     // This needs to convert into the actual asset and verify that the claimer is valid. 
+    //     IGeras(gerasAddr).transfer(address(this), claimer, gerasAmt);
+
+    // }
 
     // function _transfer(address sender, address recipient, uint256 amount) internal virtual {
     //     require(sender != address(0), "HONOR: transfer from the zero address");

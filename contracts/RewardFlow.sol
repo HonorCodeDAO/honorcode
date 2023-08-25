@@ -6,16 +6,19 @@ pragma solidity ^0.8.13;
 import "./SafeMath.sol";
 import "./BudgetQueue.sol";
 import "../interfaces/IArtifact.sol";
+import "../interfaces/ISTT.sol";
 import "../interfaces/IGeras.sol";
 import "../interfaces/IRewardFlow.sol";
+import "../interfaces/IRewardFlowFactory.sol";
 
 
 // The virtual staked asset emits rewards that flow through the Artifact graph. 
 // Each vouch claim has a certain amount of allocation power over the flow
-// through each artifact. However, the number of outbound flows is capped 
-// to make the computation feasible. 
-// The first slot is reserved for self-flow, but the rest can be allocated to 
-// any other valid artifact. 
+// through each artifact. 
+// One way to make the computation feasible would be to cap the number of 
+// outbound flow slots, reserving the first for self-flow.
+// However, the solution here is to do asynchronous flows triggered by 
+// contract events, where the flows occur in round-robin fashion.
 
 
 struct Allocation {
@@ -23,12 +26,23 @@ struct Allocation {
     uint amount;
 }
 
-
-contract RewardFlowFactory {
+contract RewardFlowFactory is IRewardFlowFactory {
     mapping (address => address) artifactToRF;
+    address private honorAddress;
+
+    constructor(address honorAddr) {
+        honorAddress = honorAddr;
+    }
+
+    function getArtiToRF(address artiOrRF) external override view returns(address) {
+        return artifactToRF[artiOrRF];
+    }
+
 
     function createRewardFlow(address artifactAddr_, address gerasAddr_) public returns(address) {
         require(artifactToRF[artifactAddr_] == address(0), 'RewardFlow for artifact exists');
+        require(ISTT(honorAddress).balanceOf(artifactAddr_) != 0, 'Target artifact has no HONOR');
+
         artifactToRF[artifactAddr_] = address(new RewardFlow(artifactAddr_, gerasAddr_));
         require(artifactToRF[artifactToRF[artifactAddr_]] == address(0), 'Artifact for RewardFlow exists');
 
@@ -64,6 +78,7 @@ contract RewardFlow is IRewardFlow {
     address public artifactAddr;
     address public gerasAddr;
     address public stakedAssetAddr;
+    address public rfFactory; 
     // address public honorAddr;
     uint public accumulatedPayout;
     uint public availableReward;
@@ -75,10 +90,10 @@ contract RewardFlow is IRewardFlow {
         // require(IArtifact(artifactAddr).getBuilder() == msg.sender, 'Invalid RF builder');
         // require(IArtifact(artifactAddr).getRewardFlow() == address(0));
 
-
         // IArtifact(artifactAddr).setRewardFlow();
         artifactAddr = artifactAddr_;
         gerasAddr = gerasAddr_;
+        rfFactory = msg.sender;
         // stakedAssetAddr = stakedAssetAddr_;
         // Default is to keep all flow to this artifact.
         // budgetFlow[address(this)] = 1 << 32 - 1;
@@ -134,7 +149,7 @@ contract RewardFlow is IRewardFlow {
         require(allocAmt <= MAX_ALLOCATION, 'Budget Allocation > 1024');
         require(IArtifact(artifactAddr).balanceOf(msg.sender) > 0, 'Sender has not vouched');
         require(address(this) != targetAddr, 'Artifact self-reward not allowed');
-        // require(artifactToRF[targetAddr], 'RewardFlow not found');
+        require(IRewardFlowFactory(rfFactory).getArtiToRF(targetAddr) != address(0), 'RewardFlow not found');
 
         if (positions[msg.sender] > 0) {
             queuePosition = positions[msg.sender];

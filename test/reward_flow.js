@@ -95,11 +95,19 @@ contract('RewardFlow', (accounts, deployer) => {
 
     const geras = (await HonorInstance.getGeras.call());
     const GerasInstance = await Geras.at(geras);
-    const RewardFlowFactoryInstance = await RewardFlowFactory.deployed();
+    const RewardFlowFactoryInstance = await RewardFlowFactory.new(HonorInstance.address);
     const RewardFlowAddr = await RewardFlowFactoryInstance.createRewardFlow.call(rootAddr, geras);
     await RewardFlowFactoryInstance.createRewardFlow(rootAddr, geras);
     const RewardFlowAddrNew = await RewardFlowFactoryInstance.createRewardFlow.call(newAddr, geras);
     await RewardFlowFactoryInstance.createRewardFlow(newAddr, geras);
+
+
+    it("Check that unverified create RF reverts.", async () =>{
+        try{await RewardFlowFactoryInstance.createRewardFlow(accounts[0], geras);}
+        catch{return;}
+        assert.fail("Unverified create RF does not revert.");
+    });
+    
 
     // module.exports = function(deployer) {
     //   const RewardFlowInstance = await deployer.deploy(RewardFlow, rootAddr, geras);
@@ -136,22 +144,25 @@ contract('RewardFlow', (accounts, deployer) => {
     console.log(artifactTwoEndingBalanceGeras);
     console.log(rewardAmt);
 
-    // it("Check that self reward reverts.", async () =>{
-    //     try{
-    //       const selfAlloc = (await RewardFlowInstance.submitAllocation(RewardFlowInstance.address, 128));
-    //     }
-    //     catch{return;}
-    //     assert.fail("Self reward does not revert.");
-    // });
+    it("Check that self reward reverts.", async () =>{
+        try{await RewardFlowInstance.submitAllocation(RewardFlowInstance.address, 128);}
+        catch{return;}
+        assert.fail("Self reward does not revert.");
+    });
 
-    assert(artifactOneStartingBalanceGeras == Math.floor(rewardAmt), 'starting root geras Incorrect');
-    assert(artifactOneEndingBalanceGeras == 312143264840, 'ending root geras Incorrect');
-    assert(artifactTwoEndingBalanceGeras == Math.floor(rewardAmt) - 312143264840, 'new artifact geras Incorrect');
+
+    const startingGeras = Math.floor(rewardAmt); // 356736150748; //
+    const finalGeras = 312143264840; //312144131905; // 
+
+    // ENABLE THESE ASSERTS 
+    assert(artifactOneStartingBalanceGeras == startingGeras, 'starting root geras Incorrect');
+    assert(artifactOneEndingBalanceGeras   == finalGeras, 'ending root geras Incorrect');
+    assert(artifactTwoEndingBalanceGeras   == startingGeras - finalGeras, 'new artifact geras Incorrect');
+
     // await RewardFlowInstance.payForward();
     // const artifactOneFinalBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowInstance.address)).toNumber();
     // console.log(artifactOneFinalBalanceGeras);
     // assert(artifactOneFinalBalanceGeras == 274721009053, 'final root geras Incorrect');
-
 
     var bytecode = RewardFlowInstance.constructor._json.bytecode;
     var deployed = RewardFlowInstance.constructor._json.deployedBytecode;
@@ -160,7 +171,6 @@ contract('RewardFlow', (accounts, deployer) => {
     console.log("size of RewardFlow bytecode in bytes = ", sizeOfB);
     console.log("size of RewardFlow deployed in bytes = ", sizeOfD);
     console.log("initialisation and constructor code in bytes = ", sizeOfB - sizeOfD);
-
 
     bytecode = HonorInstance.constructor._json.bytecode;
     deployed = HonorInstance.constructor._json.deployedBytecode;
@@ -197,7 +207,7 @@ contract('RewardFlow', (accounts, deployer) => {
     // advanceTime(36000);
     // console.log((await HonorInstance.getArtifactAccumulatedHonorHours.call(newAddr)).toNumber());
 
-    const RewardFlowFactoryInstance = await RewardFlowFactory.deployed();
+    const RewardFlowFactoryInstance = await RewardFlowFactory.new(HonorInstance.address);
     const RewardFlowAddr = await RewardFlowFactoryInstance.createRewardFlow.call(rootAddr, geras);
     await RewardFlowFactoryInstance.createRewardFlow(rootAddr, geras);
     const RewardFlowAddrNew = await RewardFlowFactoryInstance.createRewardFlow.call(newAddr, geras);
@@ -227,9 +237,6 @@ contract('RewardFlow', (accounts, deployer) => {
 
     const expectedBuilderChange = 20;
     assert.equal(builderEndingBalance, builderStartingBalance + expectedBuilderChange, "Incorrect change for builder");
-
-
-
 
   });
   // it("get the size of the contract", function() {

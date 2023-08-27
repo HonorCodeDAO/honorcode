@@ -25,7 +25,7 @@ contract Honor is ISTT {
     address public rootArtifact;
     address public stakedAssetAddr = address(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
     address public gerasAddr;
-    address public rewardFlow;
+    address public rewardFlowFactory;
     // address public owner;
     uint private _totalSupply;
     uint constant VALIDATE_AMT = 1;
@@ -51,17 +51,23 @@ contract Honor is ISTT {
         // IArtifact(rootArtifact).vouch(tx.origin);
         // require(_balances[rootArtifact] > 0, "root balance 0");
         IArtifact(rootArtifact).initVouch(msg.sender, 10000);
+        IArtifact(rootArtifact).validate();
         _balances[rootArtifact] = 10000;
         // owner = msg.sender;
     }
 
-    function initializeRF() external returns(address) {
-        return rewardFlow;
+    function setRewardFlowFactory() external override {
+        require(rewardFlowFactory == address(0), 'RF factory already set');
+        rewardFlowFactory = msg.sender;
     }
 
-    function getStakedAssetAddress() public view returns(address) {
-        return stakedAssetAddr; 
-    }
+    // function initializeRF() external returns(address) {
+    //     return rewardFlowFactory;
+    // }
+
+    // function getStakedAssetAddress() public view returns(address) {
+    //     return stakedAssetAddr; 
+    // }
 
     function balanceOf(address addr) public view returns(uint) {
         return _balances[addr]; 
@@ -72,36 +78,36 @@ contract Honor is ISTT {
     }
 
     function internalHonorBalanceOfArtifact(address addr) public view returns(uint) {
-        return IArtifact(addr).getInternalHonor();
+        return IArtifact(addr).honorWithin();
     }
     
     function getArtifactBuilder(address addr) public view returns(address) {
-        return IArtifact(addr).getBuilder();
+        return IArtifact(addr).builder();
     }
 
     function getArtifactAccumulatedHonorHours(address addr) public view returns(uint) {
-        return IArtifact(addr).accumulatedHonorHours();
+        return IArtifact(addr).accHonorHours();
     }
 
-    function getRootArtifact() public view returns(address) {
-        return rootArtifact; 
-    }
+    // function rootArtifact() public view returns(address) {
+    //     return rootArtifact; 
+    // }
 
     // function getArtifactRewardFlow(address addr) public view returns(address) {
-    //     return IArtifact(addr).getRewardFlow(); 
+    //     return IArtifact(addr).rewardFlow(); 
     // }
 
     // function getNewRewardFlow(address stakedAssetAddr_, address artifactAddr_, address gerasAddr_) public returns(address) {
     //     return address(rfFact.createRewardFlow(stakedAssetAddr_, artifactAddr_, gerasAddr_)); 
     // }
 
-    function getStakedAsset() external override view returns(address) {
-        return stakedAssetAddr; 
-    }
+    // function getStakedAsset() external override view returns(address) {
+    //     return stakedAssetAddr; 
+    // }
 
-    function getGeras() external override view returns(address) {
-        return gerasAddr; 
-    }
+    // function getGeras() external override view returns(address) {
+    //     return gerasAddr; 
+    // }
 
     // function updateStakingRewards(address addr) public returns (uint newRewards) { 
     //     newRewards = uint(block.timestamp - _lastUpdated[addr]) * _stakedAsset[addr];
@@ -121,7 +127,7 @@ contract Honor is ISTT {
         uint hnrAmt = IArtifact(_from).unvouch(msg.sender, amount);
         _transfer(_from, _to, hnrAmt);
 
-        require(IArtifact(_from).getHonorAddr() == address(this), 'artifact doesnt exist');
+        require(IArtifact(_from).honorAddr() == address(this), 'artifact doesnt exist');
         revouchAmt = IArtifact(_to).vouch(msg.sender); 
 
         emit Vouch(msg.sender, _from, _to, hnrAmt);
@@ -131,13 +137,16 @@ contract Honor is ISTT {
      * Propose adding a new artifact that refers to certain link or document. 
      */ 
     function proposeArtifact(address _from, address builder, string memory location) public returns(address proposedAddr) { 
-
-        require(IArtifact(_from).balanceOf(msg.sender) >= VALIDATE_AMT, "Insuff. proposer bal");
+        // We'll check if sender has a positive balance but will still fail below if insufficient
+        require(IArtifact(_from).balanceOf(msg.sender) > 0, "Insuff. proposer/source bal");
+        // require(balanceOf(msg.sender) >= VALIDATE_AMT, "Insuff. proposer bal");
         proposedAddr = (IArtifactory(artifactoryAddr).createArtifact(builder, address(this), location));
 
         uint hnrAmt = IArtifact(_from).unvouch(msg.sender, VALIDATE_AMT);
+        // uint hnrAmt = vouch(_from, proposedAddr, VALIDATE_AMT);
+
         // uint hnrAmt = 1;
-        _transfer(_from, proposedAddr, hnrAmt);
+        _transfer(_from, proposedAddr, hnrAmt);// VALIDATE_AMT);
         IArtifact(proposedAddr).receiveDonation();
         IArtifact(proposedAddr).validate();
         // latestProposed = proposedAddr;
@@ -193,6 +202,8 @@ contract Geras is IGeras {
     address public stakedAssetAddr = address(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
     uint public totalVirtualStakedAsset;
     uint public totalVirtualStakedReward;
+    uint public redeemableReward;
+
     // uint public claimableReward;
     // Percentage of 1024
     // uint public claimableConversionRate = 128;
@@ -234,7 +245,7 @@ contract Geras is IGeras {
     }
 
     function getStakedAsset(address stakeTarget) external view returns (uint) {
-        return totalVirtualStakedAsset;//_stakedAsset[stakeTarget];
+        return _stakedAsset[stakeTarget];
     }
 
     function unstakeAsset(address stakeTarget, uint amount) public {
@@ -278,8 +289,9 @@ contract Geras is IGeras {
     function transfer(address sender, address recipient, uint256 amount) public virtual {
         // require(sender != address(0), "GERAS: transfer from the zero address");
         // require(recipient != address(0), "GERAS: transfer to the zero address");
-        require(IArtifact(IRewardFlow(sender).getArtifact()).isValidated());
-        require(IArtifact(IRewardFlow(recipient).getArtifact()).isValidated());
+        require(IArtifact(IRewardFlow(sender).getArtifact()).isValidated() && (
+            IArtifact(IRewardFlow(recipient).getArtifact()).isValidated()), 
+            'Both sender and receiver require validation');
 
         uint256 senderBalance = _balances[sender];
         require(senderBalance >= amount, "GERAS: tfer exceeds bal");

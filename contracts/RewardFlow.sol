@@ -32,6 +32,7 @@ contract RewardFlowFactory is IRewardFlowFactory {
 
     constructor(address honorAddr) {
         honorAddress = honorAddr;
+        ISTT(honorAddr).setRewardFlowFactory();
     }
 
     function getArtiToRF(address artiOrRF) external override view returns(address) {
@@ -45,8 +46,9 @@ contract RewardFlowFactory is IRewardFlowFactory {
 
         artifactToRF[artifactAddr_] = address(new RewardFlow(artifactAddr_, gerasAddr_));
         require(artifactToRF[artifactToRF[artifactAddr_]] == address(0), 'Artifact for RewardFlow exists');
-
         artifactToRF[artifactToRF[artifactAddr_]] = artifactAddr_;
+
+        IRewardFlow(artifactToRF[artifactAddr_]).setArtifact();
         return artifactToRF[artifactAddr_];
     }
 }
@@ -88,9 +90,8 @@ contract RewardFlow is IRewardFlow {
 
     constructor(address artifactAddr_, address gerasAddr_) {
         // require(IArtifact(artifactAddr).getBuilder() == msg.sender, 'Invalid RF builder');
-        // require(IArtifact(artifactAddr).getRewardFlow() == address(0));
+        // require(IArtifact(artifactAddr).rewardFlow() == address(0));
 
-        // IArtifact(artifactAddr).setRewardFlow();
         artifactAddr = artifactAddr_;
         gerasAddr = gerasAddr_;
         rfFactory = msg.sender;
@@ -103,6 +104,10 @@ contract RewardFlow is IRewardFlow {
 
     function getArtifact() external override view returns (address) {
         return artifactAddr;
+    }
+
+    function setArtifact() external override {
+        IArtifact(artifactAddr).setRewardFlow();
     }
 
     // When called, dequeue the next item, calculate the amount to send, and transfer.
@@ -144,6 +149,15 @@ contract RewardFlow is IRewardFlow {
         availableReward += amtToReceive;
     }
 
+
+    /** 
+        * Redirect some amount of reward flow towards another artifact. 
+        * This will create a new position for the sender, as well as entry within the budget queue.
+        * The allocation will be interpreted as a fraction of the RF that the sender 
+        * currently claims: which is derived from the vouch-time of that sender.
+        * If an allocation already exists for this sender, it should be removed and replaced 
+        * with this one. 
+    */
     function submitAllocation(address targetAddr, uint allocAmt) external returns (uint queuePosition) {
 
         require(allocAmt <= MAX_ALLOCATION, 'Budget Allocation > 1024');
@@ -164,27 +178,22 @@ contract RewardFlow is IRewardFlow {
         emit Allocate(msg.sender, targetAddr, allocAmt);
     }
 
-    // function redeemReward(address claimer, uint redeemAmt) external returns (uint gerasAmt) {
+    /** 
+        * Direct a redemption request to the artifact for processing. 
+        * This contract holds the available Geras for all claims, while the artifact
+        * tracks how much each claimer is entitled to given their vouching time. 
+        * Once the artifact checks that this claimer is due some amount,
+        * the request will be finalized and transferred by the Geras contract (or denied).
+    */
+    function redeemReward(address claimer, uint redeemAmt) external returns (uint gerasAmt) {
 
-        // uint totalClaim = IArtifact(artifactAddr).redeemRewardClaim(address claimer, redeemAmt);
-    //     uint gerasAmt = IGeras(gerasAddr).balanceOf(address(this)) * redeemAmt / totalClaim;
+        uint totalClaim = IArtifact(artifactAddr).redeemRewardClaim(claimer, redeemAmt);
+        uint gerasAmt = IGeras(gerasAddr).balanceOf(address(this)) * redeemAmt / totalClaim;
 
-    //     // This needs to convert into the actual asset and verify that the claimer is valid. 
-    //     IGeras(gerasAddr).transfer(address(this), claimer, gerasAmt);
+        // This needs to convert into the actual asset and verify that the claimer is valid. 
+        IGeras(gerasAddr).transfer(address(this), claimer, gerasAmt);
 
-    // }
-
-    // function _transfer(address sender, address recipient, uint256 amount) internal virtual {
-    //     require(sender != address(0), "HONOR: transfer from the zero address");
-    //     require(recipient != address(0), "HONOR: transfer to the zero address");
-
-    //     uint256 senderBalance = _balances[sender];
-    //     require(senderBalance >= amount, "HONOR: transfer amount exceeds balance");
-    //     _balances[sender] = senderBalance - amount;
-    //     _balances[recipient] += amount;
-
-    //     emit Transfer(sender, recipient, amount);
-    // }
+    }
 
 }
 

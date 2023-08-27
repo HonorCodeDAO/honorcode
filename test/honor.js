@@ -24,7 +24,7 @@ contract('Honor', (accounts, deployer) => {
     const HonorInstance = await Honor.new(ArtiFactoryInstance.address);
 
     // const ArtifactInstance = await Artifact.deployed();
-    const artyAddr = await HonorInstance.getRootArtifact.call();
+    const artyAddr = await HonorInstance.rootArtifact.call();
     const balance = await HonorInstance.balanceOf.call(artyAddr);
     // const balance = await HonorInstance.balanceOf.call(accounts[1]);
 
@@ -37,7 +37,7 @@ contract('Honor', (accounts, deployer) => {
     console.log("size of Honor bytecode in bytes = ", sizeOfB);
     console.log("size of Honor deployed in bytes = ", sizeOfD);
 
-    const rootAddr = await HonorInstance.getRootArtifact.call()
+    const rootAddr = await HonorInstance.rootArtifact.call()
     // console.log("msg sender", msg.sender);
     console.log("root", rootAddr);
 
@@ -45,7 +45,7 @@ contract('Honor', (accounts, deployer) => {
     // const newAddr = await HonorInstance.proposeArtifact(rootAddr, accountThree, 'new artifact');
     // console.log("new", newAddr);
     const ArtifactInstance = await Artifact.at(rootAddr);
-    
+
     bytecode = ArtifactInstance.constructor._json.bytecode;
     deployed = ArtifactInstance.constructor._json.deployedBytecode;
     sizeOfB  = bytecode.length / 2;
@@ -78,7 +78,7 @@ contract('Honor', (accounts, deployer) => {
     // const accountOneStartingBalance = (await HonorInstance.getBalance.call(accountOne)).toNumber();
     // const accountTwoStartingBalance = (await HonorInstance.getBalance.call(accountTwo)).toNumber();
 
-    const rootAddr = await HonorInstance.getRootArtifact.call();
+    const rootAddr = await HonorInstance.rootArtifact.call();
     const rootBalance = await HonorInstance.balanceOf.call(rootAddr);
 
     // Make transaction from first account to second.
@@ -123,7 +123,7 @@ contract('Honor', (accounts, deployer) => {
     const ArtiFactoryInstance = await Artifactory.deployed();
     const HonorInstance = await Honor.new(ArtiFactoryInstance.address);
 
-    const rootAddr = await HonorInstance.getRootArtifact.call();
+    const rootAddr = await HonorInstance.rootArtifact.call();
     const rootBalance = await HonorInstance.balanceOf.call(rootAddr);
     // const newAddr = await HonorInstance.proposeArtifact.call(rootAddr, builderTwo, 'new artifact');
     const newAddr = await HonorInstance.proposeArtifact.call(rootAddr, builderTwo, 'new artifact');

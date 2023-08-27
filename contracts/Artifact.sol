@@ -6,7 +6,8 @@ import "./SafeMath.sol";
 import "../interfaces/IArtifact.sol";
 import "../interfaces/ISTT.sol";
 // import "./Geras.sol";
-// import "../interfaces/IRewardFlow.sol";
+import "../interfaces/IRewardFlow.sol";
+import "../interfaces/IRewardFlowFactory.sol";
 // import "./RewardFlow.sol";
 
 // This contract represents an artifact, which is a desitnation of Honor and has its own 
@@ -17,6 +18,8 @@ import "../interfaces/ISTT.sol";
 
 
 contract Artifact is IArtifact {
+
+    uint32 private _lastUpdated;
 
     string public location; 
     address public honorAddr;
@@ -29,9 +32,8 @@ contract Artifact is IArtifact {
     uint public builderHonor;
     // uint public accReward;
     // uint public virtualStaked;
-    uint32 private _lastUpdated;
     uint private _totalSupply;
-    bool private _isProposed;
+    bool public isValidated;
     address public rewardFlow;
 
     // uint public constant rewardMult = 1;
@@ -66,16 +68,20 @@ contract Artifact is IArtifact {
     //         ISTT(honorAddr).getStakedAsset(), address(this), ISTT(honorAddr).getGeras()));
     // }
 
-
+    // Intended to be used only once and only for the root artifact.
     function initVouch(address account, uint inputHonor) external returns(uint vouchAmt) {
-        // require(msg.sender == honorAddr, "Initial");
+        require(msg.sender == honorAddr, "Initialization by HONOR only.");
         vouchAmt = SafeMath.floorSqrt(inputHonor);
         _mint(account, vouchAmt);
         honorWithin += inputHonor;
         // netHonor += inputHonor;
     }
 
-
+    /** 
+      * Keep a time-weighted record of the vouch claims of each vouching address. 
+      * These will be updated asynchronously, although the total will always 
+      * have the correct value since we know the total supply.
+    */
     function updateAccumulated(address voucher) private returns (uint256) {
 
         _accRewardClaims[address(this)] += _totalSupply * (
@@ -92,11 +98,17 @@ contract Artifact is IArtifact {
         return _accRewardClaims[voucher];
     }
 
-    function redeemRewardClaim(address voucher, uint256 redeemAmt) private returns (uint256 totalClaim) {
+    /**
+      * Given some amount to redeem by the artifact's RF contract, check how much 
+      * vouch-time the claimer has accumulated and deduct. The return value is meant to be 
+      * a ratio relative to the total available, so that the Geras contract knows how much
+      * is redeemable by this claimer.
+    */
+    function redeemRewardClaim(address claimer, uint256 redeemAmt) external override returns (uint256 totalClaim) {
         require(msg.sender == rewardFlow);
-        require(_accRewardClaims[voucher] >= redeemAmt, 'amount unavailable to redeem');
+        require(_accRewardClaims[claimer] >= redeemAmt, 'amount unavailable to redeem');
         totalClaim = _accRewardClaims[address(this)]; 
-        _accRewardClaims[voucher] = _accRewardClaims[voucher] - redeemAmt;
+        _accRewardClaims[claimer] = _accRewardClaims[claimer] - redeemAmt;
         _accRewardClaims[address(this)] = _accRewardClaims[address(this)] - redeemAmt;
         // remainingClaim = _accRewardClaims[voucher];
     }
@@ -215,7 +227,7 @@ contract Artifact is IArtifact {
      * The amount of the vouch claim going to the builder will increase based on the vouched HONOR over time. 
      */
     function recomputeBuilderVouch() private returns (uint newBuilderVouchAmt) {
-        if (ISTT(honorAddr).getRootArtifact() == address(this)) { 
+        if (ISTT(honorAddr).rootArtifact() == address(this)) { 
             return 0; 
         }
         uint64 timeElapsed = uint32(block.timestamp) - _lastUpdated;
@@ -237,34 +249,39 @@ contract Artifact is IArtifact {
         return _balances[addr];
     }
 
-    function getBuilder() external override view returns(address) {
-        return builder;
-    }
+    // function getBuilder() external override view returns(address) {
+    //     return builder;
+    // }
 
-    function getInternalHonor() external override view returns(uint) {
-        return honorWithin;
-    }
+    // function getInternalHonor() external override view returns(uint) {
+    //     return honorWithin;
+    // }
 
-    function getHonorAddr() external override view returns(address) {
-        return honorAddr;
-    }
+    // function getHonorAddr() external override view returns(address) {
+    //     return honorAddr;
+    // }
 
     // function getNetHonor() external override view returns(uint) {
     //     return netHonor;
     // }
 
-    function getRewardFlow() external override view returns(address) {
-        return rewardFlow;
-    }
+    // function getRewardFlow() external override view returns(address) {
+    //     return rewardFlow;
+    // }
 
-    function setRewardFlow() external returns(address) {
-        require(rewardFlow == address(0));
+
+    function setRewardFlow() external override returns(address rewardFlow) {
+        require(rewardFlow == address(0), 'Artifact rewardFlow already set ');
+
+        require(IRewardFlowFactory(IRewardFlow(
+            msg.sender).rfFactory()).getArtiToRF(address(this)) == msg.sender, "RF/artifact pair don't match");
+
         rewardFlow = msg.sender;
     }
 
-    function accumulatedHonorHours() external override view returns(uint) {
-        return accHonorHours;
-    }
+    // function accumulatedHonorHours() external override view returns(uint) {
+    //     return accHonorHours;
+    // }
 
     function receiveDonation() external override returns(uint) {
         honorWithin += SafeMath.sub(ISTT(honorAddr).balanceOf(address(this)), honorWithin);
@@ -272,14 +289,14 @@ contract Artifact is IArtifact {
         return honorWithin;
     }
 
-    function isValidated() external override view returns(bool) {
-        return !_isProposed;
-    }
+    // function isValidated() external override view returns(bool) {
+    //     return !_isProposed;
+    // }
 
     function validate() external override returns(bool) {
         require(msg.sender == honorAddr, 'Invalid validation source');
-        _isProposed = false;
-        return !_isProposed;
+        isValidated = true;
+        return isValidated;
     }
 
 

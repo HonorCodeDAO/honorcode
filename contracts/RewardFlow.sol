@@ -102,10 +102,6 @@ contract RewardFlow is IRewardFlow {
         bq = new BudgetQueue(address(this));
     }
 
-    function getArtifact() external override view returns (address) {
-        return artifactAddr;
-    }
-
     function setArtifact() external override {
         IArtifact(artifactAddr).setRewardFlow();
     }

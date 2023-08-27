@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 interface IRewardFlow {
 
     // function balanceOf(address addr) external view returns(uint);
-    function getArtifact() external view returns(address);
+    function artifactAddr() external view returns(address);
     function rfFactory() external view returns(address);
     function payForward() external returns(address, uint);
     function setArtifact() external;

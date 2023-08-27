@@ -65,10 +65,6 @@ contract Honor is ISTT {
     //     return rewardFlowFactory;
     // }
 
-    // function getStakedAssetAddress() public view returns(address) {
-    //     return stakedAssetAddr; 
-    // }
-
     function balanceOf(address addr) public view returns(uint) {
         return _balances[addr]; 
     }
@@ -88,26 +84,6 @@ contract Honor is ISTT {
     function getArtifactAccumulatedHonorHours(address addr) public view returns(uint) {
         return IArtifact(addr).accHonorHours();
     }
-
-    // function rootArtifact() public view returns(address) {
-    //     return rootArtifact; 
-    // }
-
-    // function getArtifactRewardFlow(address addr) public view returns(address) {
-    //     return IArtifact(addr).rewardFlow(); 
-    // }
-
-    // function getNewRewardFlow(address stakedAssetAddr_, address artifactAddr_, address gerasAddr_) public returns(address) {
-    //     return address(rfFact.createRewardFlow(stakedAssetAddr_, artifactAddr_, gerasAddr_)); 
-    // }
-
-    // function getStakedAsset() external override view returns(address) {
-    //     return stakedAssetAddr; 
-    // }
-
-    // function getGeras() external override view returns(address) {
-    //     return gerasAddr; 
-    // }
 
     // function updateStakingRewards(address addr) public returns (uint newRewards) { 
     //     newRewards = uint(block.timestamp - _lastUpdated[addr]) * _stakedAsset[addr];
@@ -260,7 +236,7 @@ contract Geras is IGeras {
 
     function distributeGeras(address rewardFlowAddr) public {
         // For now, only root artifact can generate Geras.
-        require(IRewardFlow(rewardFlowAddr).getArtifact() == rootArtifact, 'Only stake with root artifact');
+        require(IRewardFlow(rewardFlowAddr).artifactAddr() == rootArtifact, 'Only stake with root artifact');
         uint32 timeElapsed = uint32(block.timestamp) - _lastUpdated;
 
         uint newGeras = _stakedAsset[rootArtifact] * EXPECTED_REWARD_PER_YEAR_PER_THOUSAND_STAKED / 1024;
@@ -289,8 +265,8 @@ contract Geras is IGeras {
     function transfer(address sender, address recipient, uint256 amount) public virtual {
         // require(sender != address(0), "GERAS: transfer from the zero address");
         // require(recipient != address(0), "GERAS: transfer to the zero address");
-        require(IArtifact(IRewardFlow(sender).getArtifact()).isValidated() && (
-            IArtifact(IRewardFlow(recipient).getArtifact()).isValidated()), 
+        require(IArtifact(IRewardFlow(sender).artifactAddr()).isValidated() && (
+            IArtifact(IRewardFlow(recipient).artifactAddr()).isValidated()), 
             'Both sender and receiver require validation');
 
         uint256 senderBalance = _balances[sender];

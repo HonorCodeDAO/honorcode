@@ -249,27 +249,6 @@ contract Artifact is IArtifact {
         return _balances[addr];
     }
 
-    // function getBuilder() external override view returns(address) {
-    //     return builder;
-    // }
-
-    // function getInternalHonor() external override view returns(uint) {
-    //     return honorWithin;
-    // }
-
-    // function getHonorAddr() external override view returns(address) {
-    //     return honorAddr;
-    // }
-
-    // function getNetHonor() external override view returns(uint) {
-    //     return netHonor;
-    // }
-
-    // function getRewardFlow() external override view returns(address) {
-    //     return rewardFlow;
-    // }
-
-
     function setRewardFlow() external override returns(address rewardFlow) {
         require(rewardFlow == address(0), 'Artifact rewardFlow already set ');
 
@@ -279,19 +258,11 @@ contract Artifact is IArtifact {
         rewardFlow = msg.sender;
     }
 
-    // function accumulatedHonorHours() external override view returns(uint) {
-    //     return accHonorHours;
-    // }
-
     function receiveDonation() external override returns(uint) {
         honorWithin += SafeMath.sub(ISTT(honorAddr).balanceOf(address(this)), honorWithin);
         // netHonor += SafeMath.sub(totalHonor, honorWithin);
         return honorWithin;
     }
-
-    // function isValidated() external override view returns(bool) {
-    //     return !_isProposed;
-    // }
 
     function validate() external override returns(bool) {
         require(msg.sender == honorAddr, 'Invalid validation source');

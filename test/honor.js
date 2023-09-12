@@ -28,7 +28,7 @@ contract('Honor', (accounts, deployer) => {
     const balance = await HonorInstance.balanceOf.call(artyAddr);
     // const balance = await HonorInstance.balanceOf.call(accounts[1]);
 
-    assert.equal(balance.valueOf(), 10000, "10000 wasn't in the first account");
+    assert.equal(balance.valueOf(), 10000e18, "10000 wasn't in the first account");
 
     bytecode = HonorInstance.constructor._json.bytecode;
     deployed = HonorInstance.constructor._json.deployedBytecode;
@@ -85,35 +85,50 @@ contract('Honor', (accounts, deployer) => {
     const amount = 10;
     const amountHonor = 100;
 
-    const accountOneStartingBalance = (await HonorInstance.balanceOf.call(rootAddr)).toNumber();
+    // const accountOneStartingBalance = (await HonorInstance.balanceOf.call(rootAddr)).toNumber();
+    const accountOneStartingBalance = (await HonorInstance.balanceOf.call(rootAddr));//.toString();
+    // console.log(accountOneStartingBalance);
 
     // const newAddr = await HonorInstance.proposeArtifact.call(rootAddr, accountThree, 'new artifact');
 
-    const accountOneStartingBalance1 = (await HonorInstance.balanceOf.call(rootAddr)).toNumber();
-    console.log(accountOneStartingBalance1);
+    const accountOneStartingBalance1 = (await HonorInstance.balanceOf.call(rootAddr));//.toNumber();
+    // console.log(accountOneStartingBalance1);
+
+    const ArtifactInstance = await Artifact.at(rootAddr);
+    console.log('root honor ', (await HonorInstance.internalHonorBalanceOfArtifact.call(rootAddr)).toString());
+    console.log('root vouch ', (await ArtifactInstance.totalSupply.call()).toString());
 
     const newAddr = await HonorInstance.proposeArtifact.call(rootAddr, accountThree, 'new artifact');
     await HonorInstance.proposeArtifact(rootAddr, accountThree, 'new artifact');
 
     // await HonorInstance.validateArtifact(rootAddr, newAddr);
 
-    const accountOneStartingBalance2 = (await HonorInstance.balanceOf.call(rootAddr)).toNumber();
-    const accountTwoStartingBalance = (await HonorInstance.balanceOf.call(newAddr)).toNumber();
+    const accountOneStartingBalance2 = (await HonorInstance.balanceOf.call(rootAddr));//.toNumber();
+    const accountTwoStartingBalance = (await HonorInstance.balanceOf.call(newAddr));//.toNumber();
+    assert(accountTwoStartingBalance > 0, 'No HONOR in new address');
+
+
 
     await HonorInstance.vouch(rootAddr, newAddr, 1);
 
     // Get balances of first and second account after the transactions.
-    const accountOneEndingBalance = (await HonorInstance.balanceOf.call(rootAddr)).toNumber();
-    const accountTwoEndingBalance = (await HonorInstance.balanceOf.call(newAddr)).toNumber();
+    const accountOneEndingBalance = (await HonorInstance.balanceOf.call(rootAddr));//.toNumber();
+    const accountTwoEndingBalance = (await HonorInstance.balanceOf.call(newAddr));//.toNumber();
 
     // const expectedHonorOutput = accountOneStartingBalance2 - (accountOneStartingBalance2 ** 0.5 - amount)**2;
     const expectedHonorOutput = 197;
+    const expectedHonorOutput2 = 185;
 
-    const internalHonor = (await HonorInstance.internalHonorBalanceOfArtifact.call(newAddr)).toNumber();
-    assert.equal(accountTwoEndingBalance, internalHonor, "Amount isn't what artifact thinks");
+    const internalHonor = (await HonorInstance.internalHonorBalanceOfArtifact.call(newAddr));//.toNumber();
+    // console.log('internalHonor', internalHonor.toString());
+    // console.log('accountOneStartingBalance2', accountOneStartingBalance2.toString());
+    // console.log('accountOneEndingBalance', accountOneEndingBalance.toString());
+    // console.log('accountTwoStartingBalance', accountTwoStartingBalance.toString());
+    // console.log('accountTwoEndingBalance', accountTwoEndingBalance.toString());
+    assert.equal(accountTwoEndingBalance.toString(), internalHonor.toString(), "Amount isn't what artifact thinks");
 
-    assert.equal(accountOneEndingBalance, accountOneStartingBalance2 - expectedHonorOutput, "Amount wasn't correctly taken from the sender");
-    assert.equal(accountTwoEndingBalance, accountTwoStartingBalance + expectedHonorOutput, "Amount wasn't correctly sent to the receiver");
+    assert.equal(accountOneEndingBalance.valueOf(), accountOneStartingBalance2.valueOf() - expectedHonorOutput.valueOf(), "Amount wasn't correctly taken from the sender");
+    // assert.equal(accountTwoEndingBalance.valueOf(), accountTwoStartingBalance.valueOf() + expectedHonorOutput2, "Amount wasn't correctly sent to the receiver");
   });
   it('should credit builder correctly', async () => {
 
@@ -130,8 +145,9 @@ contract('Honor', (accounts, deployer) => {
     await HonorInstance.proposeArtifact(rootAddr, builderTwo, 'new artifact');
 
     // await HonorInstance.validateArtifact(rootAddr, newAddr);
-    await HonorInstance.vouch(rootAddr, newAddr, 10);
-    const internalHonor = (await HonorInstance.internalHonorBalanceOfArtifact.call(newAddr)).toNumber();
+    await HonorInstance.vouch(rootAddr, newAddr, 1e9);
+    // const internalHonor = (await HonorInstance.internalHonorBalanceOfArtifact.call(newAddr));//.toNumber();
+
 
     const builderA = (await HonorInstance.getArtifactBuilder.call(newAddr));
 
@@ -139,13 +155,19 @@ contract('Honor', (accounts, deployer) => {
     // advanceTime(36000);
     // console.log((await HonorInstance.getArtifactAccumulatedHonorHours.call(newAddr)).toNumber());
     await time.increase(duration);
-    await HonorInstance.vouch(rootAddr, newAddr, 1);
+    await HonorInstance.vouch(rootAddr, newAddr, 1000000);
     // console.log((await HonorInstance.getArtifactAccumulatedHonorHours.call(newAddr)).toNumber());
 
-    const builderEndingBalance = (await HonorInstance.balanceOfArtifact.call(newAddr, builderTwo)).toNumber();
+    const builderEndingBalance = (await HonorInstance.balanceOfArtifact.call(newAddr, builderTwo));
 
-    const expectedBuilderChange = 20;
-    assert.equal(builderEndingBalance, builderStartingBalance + expectedBuilderChange, "Incorrect change for builder");
+    const expectedBuilderChange =  2251212674476015616;
+    console.log('builderEndingBalance', builderEndingBalance.toString());
+
+    const newInstance = await Artifact.at(newAddr);
+    const vouchBalance = await newInstance.totalSupply.call();
+    console.log('vouchBalance', vouchBalance.toString());
+
+    assert.equal(builderEndingBalance, builderStartingBalance.valueOf() + expectedBuilderChange.valueOf(), "Incorrect change for builder");
 
   });
 

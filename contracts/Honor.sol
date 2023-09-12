@@ -23,12 +23,13 @@ contract Honor is ISTT {
     mapping (address => uint32) private _lastUpdated;
     // mapping (address => ArtifactData.data) artifacts;
     address public rootArtifact;
+    // Assumed to be a liquid staking asset.
     address public stakedAssetAddr = address(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
     address public gerasAddr;
     address public rewardFlowFactory;
     // address public owner;
     uint private _totalSupply;
-    uint constant VALIDATE_AMT = 1;
+    uint constant VALIDATE_AMT = 1e18;
     // uint32 constant public INFLATION_PER_THOUSAND_PER_YEAR_STAKER = 500;
     // uint32 constant public INFLATION_PER_THOUSAND_PER_YEAR_VOUCHER = 500;
     uint32 constant public EXPECTED_REWARD_PER_YEAR_PER_THOUSAND_STAKED = 32;
@@ -47,12 +48,12 @@ contract Honor is ISTT {
         // gerasAddr = address(gFact.createGeras(rootArtifact, address(this)));
         gerasAddr = address(new Geras(rootArtifact, address(this)));
 
-        _mint(rootArtifact, 10000);
+        _mint(rootArtifact, 10000e18);
         // IArtifact(rootArtifact).vouch(tx.origin);
         // require(_balances[rootArtifact] > 0, "root balance 0");
-        IArtifact(rootArtifact).initVouch(msg.sender, 10000);
+        IArtifact(rootArtifact).initVouch(msg.sender, 10000e18);
         IArtifact(rootArtifact).validate();
-        _balances[rootArtifact] = 10000;
+        _balances[rootArtifact] = 10000e18;
         // owner = msg.sender;
     }
 
@@ -118,12 +119,15 @@ contract Honor is ISTT {
         // require(balanceOf(msg.sender) >= VALIDATE_AMT, "Insuff. proposer bal");
         proposedAddr = (IArtifactory(artifactoryAddr).createArtifact(builder, address(this), location));
 
+        // return proposedAddr;
         uint hnrAmt = IArtifact(_from).unvouch(msg.sender, VALIDATE_AMT);
         // uint hnrAmt = vouch(_from, proposedAddr, VALIDATE_AMT);
 
         // uint hnrAmt = 1;
+
         _transfer(_from, proposedAddr, hnrAmt);// VALIDATE_AMT);
-        IArtifact(proposedAddr).receiveDonation();
+        IArtifact(proposedAddr).initVouch(msg.sender, hnrAmt);
+        // IArtifact(proposedAddr).receiveDonation();
         IArtifact(proposedAddr).validate();
         // latestProposed = proposedAddr;
     }

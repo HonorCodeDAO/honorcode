@@ -11,6 +11,7 @@ interface ISTT {
     function stakedAssetAddr() external view returns(address);
     function rootArtifact() external view returns(address);
     function setRewardFlowFactory() external;
+    // function internalHonorBalanceOfArtifact(address addr) external view returns(uint);
 
 
 }

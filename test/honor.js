@@ -81,9 +81,8 @@ contract('Honor', (accounts, deployer) => {
     const rootAddr = await HonorInstance.rootArtifact.call();
     const rootBalance = await HonorInstance.balanceOf.call(rootAddr);
 
-    // Make transaction from first account to second.
-    const amount = 10;
-    const amountHonor = 100;
+    // const amount = 10;
+    // const amountHonor = 100;
 
     // const accountOneStartingBalance = (await HonorInstance.balanceOf.call(rootAddr)).toNumber();
     const accountOneStartingBalance = (await HonorInstance.balanceOf.call(rootAddr));//.toString();
@@ -91,7 +90,7 @@ contract('Honor', (accounts, deployer) => {
 
     // const newAddr = await HonorInstance.proposeArtifact.call(rootAddr, accountThree, 'new artifact');
 
-    const accountOneStartingBalance1 = (await HonorInstance.balanceOf.call(rootAddr));//.toNumber();
+    // const accountOneStartingBalance1 = (await HonorInstance.balanceOf.call(rootAddr));//.toNumber();
     // console.log(accountOneStartingBalance1);
 
     const ArtifactInstance = await Artifact.at(rootAddr);
@@ -106,8 +105,6 @@ contract('Honor', (accounts, deployer) => {
     const accountOneStartingBalance2 = (await HonorInstance.balanceOf.call(rootAddr));//.toNumber();
     const accountTwoStartingBalance = (await HonorInstance.balanceOf.call(newAddr));//.toNumber();
     assert(accountTwoStartingBalance > 0, 'No HONOR in new address');
-
-
 
     await HonorInstance.vouch(rootAddr, newAddr, 1);
 
@@ -140,14 +137,20 @@ contract('Honor', (accounts, deployer) => {
 
     const rootAddr = await HonorInstance.rootArtifact.call();
     const rootBalance = await HonorInstance.balanceOf.call(rootAddr);
+
+
+    const rootVouchBal = (await HonorInstance.balanceOfArtifact.call(rootAddr, accounts[0]));
+    console.log('root starting vouch balance', rootVouchBal.toString());
+    console.log('root starting honor balance', rootBalance.toString());
+
     // const newAddr = await HonorInstance.proposeArtifact.call(rootAddr, builderTwo, 'new artifact');
     const newAddr = await HonorInstance.proposeArtifact.call(rootAddr, builderTwo, 'new artifact');
     await HonorInstance.proposeArtifact(rootAddr, builderTwo, 'new artifact');
 
     // await HonorInstance.validateArtifact(rootAddr, newAddr);
+
     await HonorInstance.vouch(rootAddr, newAddr, 1e9);
     // const internalHonor = (await HonorInstance.internalHonorBalanceOfArtifact.call(newAddr));//.toNumber();
-
 
     const builderA = (await HonorInstance.getArtifactBuilder.call(newAddr));
 
@@ -160,7 +163,7 @@ contract('Honor', (accounts, deployer) => {
 
     const builderEndingBalance = (await HonorInstance.balanceOfArtifact.call(newAddr, builderTwo));
 
-    const expectedBuilderChange =  2251212674476015616;
+    const expectedBuilderChange =  394803839208783872;
     console.log('builderEndingBalance', builderEndingBalance.toString());
 
     const newInstance = await Artifact.at(newAddr);

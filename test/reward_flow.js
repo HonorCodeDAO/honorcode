@@ -93,7 +93,7 @@ contract('RewardFlow', (accounts, deployer) => {
     // assert.equal(accountOneEndingBalance, accountOneStartingBalance2 - expectedHonorOutput, "Amount wasn't correctly taken from the sender");
     // assert.equal(accountTwoEndingBalance, accountTwoStartingBalance + expectedHonorOutput, "Amount wasn't correctly sent to the receiver");
 
-const amount = 10;
+    const amount = 10;
     const amountHonor = 100;
 
     // const accountOneStartingBalance = (await HonorInstance.balanceOf.call(rootAddr)).toNumber();
@@ -114,20 +114,20 @@ const amount = 10;
     const accountTwoStartingBalance = (await HonorInstance.balanceOf.call(newAddr));//.toNumber();
     assert(accountTwoStartingBalance > 0, 'No HONOR in new address');
 
-    await HonorInstance.vouch(rootAddr, newAddr, 1);
+    await HonorInstance.vouch(rootAddr, newAddr, 1e12);
 
     // Get balances of first and second account after the transactions.
     const accountOneEndingBalance = (await HonorInstance.balanceOf.call(rootAddr));//.toNumber();
     const accountTwoEndingBalance = (await HonorInstance.balanceOf.call(newAddr));//.toNumber();
 
     // const expectedHonorOutput = accountOneStartingBalance2 - (accountOneStartingBalance2 ** 0.5 - amount)**2;
-    const expectedHonorOutput = 197;
+    const expectedHonorOutput = 186255200598997;
     const expectedHonorOutput2 = 185;
 
     const internalHonor = (await HonorInstance.internalHonorBalanceOfArtifact.call(newAddr));//.toNumber();
     // console.log('internalHonor', internalHonor.toString());
-    // console.log('accountOneStartingBalance2', accountOneStartingBalance2.toString());
-    // console.log('accountOneEndingBalance', accountOneEndingBalance.toString());
+    console.log('accountOneStartingBalance2', accountOneStartingBalance2.toString());
+    console.log('accountOneEndingBalance', accountOneEndingBalance.toString());
     // console.log('accountTwoStartingBalance', accountTwoStartingBalance.toString());
     // console.log('accountTwoEndingBalance', accountTwoEndingBalance.toString());
     assert.equal(accountTwoEndingBalance.toString(), internalHonor.toString(), "Amount isn't what artifact thinks");
@@ -283,7 +283,8 @@ const amount = 10;
 
     const builderEndingBalance = (await HonorInstance.balanceOfArtifact.call(newAddr, builderTwo));
 
-    const expectedBuilderChange =  2836349673034219520;
+    const expectedBuilderChange = 497422358940745728;// 497421259429117952;
+
     console.log('builderEndingBalance R', builderEndingBalance.toString());
     assert.equal(builderEndingBalance, builderStartingBalance.valueOf() + expectedBuilderChange.valueOf(), "Incorrect change for builder");
 

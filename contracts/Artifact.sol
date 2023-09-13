@@ -69,8 +69,10 @@ contract Artifact is IArtifact {
     // }
 
     // Intended to be used only once and only for the root artifact.
+    // We can safely take the square root since there is no other amount in this artifact.
+    // By setting the square root baseline = 2^60 once, we don't need it for the other ratios.
     function initVouch(address account, uint inputHonor) external returns(uint vouchAmt) {
-        require(msg.sender == honorAddr, "Initialization by HONOR only.");
+        require(msg.sender == honorAddr && honorWithin == 0, "Initialization by HONOR only.");
         vouchAmt = SafeMath.floorSqrt(inputHonor) << 30;
         _mint(account, vouchAmt);
         honorWithin += inputHonor;
@@ -130,16 +132,16 @@ contract Artifact is IArtifact {
         uint totalHonor = ISTT(honorAddr).balanceOf(address(this));
         uint deposit = SafeMath.sub(totalHonor, honorWithin);
 
-        // uint honorCbrt = SafeMath.floorCbrt(totalHonor);
-        // uint prevHonorCbrt = SafeMath.floorCbrt(honorWithin);
-        // vouchAmt = SafeMath.sub(honorCbrt * honorCbrt, prevHonorCbrt * prevHonorCbrt);
         updateAccumulated(account);
         updateAccumulated(address(this));
 
-        vouchAmt = (SafeMath.floorSqrt(totalHonor) << 30) - (SafeMath.floorSqrt(honorWithin) >> 30);
-        // vouchAmt = ((((SafeMath.floorSqrt(totalHonor) << 30) * _totalSupply) / ( 
-        //     SafeMath.floorSqrt(honorWithin))) >> 30) - _totalSupply;
-
+        if (SafeMath.floorSqrt(honorWithin) > 2**10) {
+            vouchAmt = ((((SafeMath.floorSqrt(totalHonor)) * _totalSupply) / ( 
+                SafeMath.floorSqrt(honorWithin)))) - _totalSupply;
+        }
+        else {
+            vouchAmt = SafeMath.floorSqrt(totalHonor) << 30;
+        }
         emit Vouch(account, address(this), deposit, vouchAmt);
         _mint(account, vouchAmt);
         recomputeBuilderVouch();
@@ -150,19 +152,32 @@ contract Artifact is IArtifact {
     /** 
       * Given some valid input vouching claim to this artifact, return the output honor. 
     */
-    function unvouch(address account, uint unvouchAmt) external override returns(uint hnrAmt) {
+    function unvouch(address account, uint unvouchAmt, bool isHonor) external override returns(uint hnrAmt) {
 
-        require(_balances[account] >= unvouchAmt, "Insuff. vouch bal");
         // require(ISTT(honorAddr).balanceOf(to) != 0, "Invalid vouching target");
         updateAccumulated(address(this));
         updateAccumulated(account);
-        uint vouchedPost = _totalSupply - unvouchAmt;
 
-        // hnrAmt = honorWithin * ((_totalSupply ** 2) >> 60) - honorWithin * ((vouchedPost ** 2) >> 60);
-        // hnrAmt = hnrAmt / honorWithin;
-        hnrAmt = honorWithin - ((honorWithin * (vouchedPost ** 2) / ((_totalSupply ** 2) >> 60)) >> 60);
+        if (!isHonor) {
+            require(_balances[account] >= unvouchAmt, "Artifact: Insuff. vouch bal");
+
+            uint vouchedPost = _totalSupply - unvouchAmt;
+            // the following line assumes unchanging builder vouch claims:
+            // hnrAmt = honorWithin * ((_totalSupply ** 2) >> 60) - honorWithin * ((vouchedPost ** 2) >> 60);
+            // hnrAmt = hnrAmt / honorWithin;
+            hnrAmt = honorWithin - ((honorWithin * (vouchedPost ** 2) / ((_totalSupply ** 2))));
+
+        }
+        else {
+            require(honorWithin >= unvouchAmt && _balances[account] > 0, "Insuff. hnr vouch bal");
+            hnrAmt = unvouchAmt;
+            unvouchAmt = _totalSupply - ((((SafeMath.floorSqrt(honorWithin - hnrAmt)) * _totalSupply) / ( 
+                SafeMath.floorSqrt(honorWithin))));
+            require(_balances[account] >= unvouchAmt, "Insuff. final vouch bal");
+        }
 
         emit Unvouch(account, address(this), hnrAmt, unvouchAmt);
+
         recomputeBuilderVouch();
         honorWithin -= hnrAmt;
         _burn(account, unvouchAmt);

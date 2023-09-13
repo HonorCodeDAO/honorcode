@@ -99,9 +99,9 @@ contract Honor is ISTT {
     function vouch(address _from, address _to, uint amount) public returns(uint revouchAmt) {
         require(_balances[_to] != 0 && _balances[_from] != 0 && IArtifact(_to).isValidated(), 
             "Inval vouch");
-        require(IArtifact(_from).balanceOf(msg.sender) >= amount, "Insuff. vouch bal");
+        require(IArtifact(_from).balanceOf(msg.sender) >= amount, "HONOR: Insuff. vouch bal");
 
-        uint hnrAmt = IArtifact(_from).unvouch(msg.sender, amount);
+        uint hnrAmt = IArtifact(_from).unvouch(msg.sender, amount, false);
         _transfer(_from, _to, hnrAmt);
 
         require(IArtifact(_from).honorAddr() == address(this), 'artifact doesnt exist');
@@ -120,13 +120,12 @@ contract Honor is ISTT {
         proposedAddr = (IArtifactory(artifactoryAddr).createArtifact(builder, address(this), location));
 
         // return proposedAddr;
-        uint hnrAmt = IArtifact(_from).unvouch(msg.sender, VALIDATE_AMT);
+        uint hnrAmt = IArtifact(_from).unvouch(msg.sender, VALIDATE_AMT, true);
         // uint hnrAmt = vouch(_from, proposedAddr, VALIDATE_AMT);
-
         // uint hnrAmt = 1;
 
-        _transfer(_from, proposedAddr, hnrAmt);// VALIDATE_AMT);
-        IArtifact(proposedAddr).initVouch(msg.sender, hnrAmt);
+        _transfer(_from, proposedAddr, VALIDATE_AMT);// VALIDATE_AMT);
+        IArtifact(proposedAddr).initVouch(msg.sender, VALIDATE_AMT);
         // IArtifact(proposedAddr).receiveDonation();
         IArtifact(proposedAddr).validate();
         // latestProposed = proposedAddr;
@@ -143,7 +142,7 @@ contract Honor is ISTT {
         }
         require(IArtifact(_from).balanceOf(msg.sender) >= VALIDATE_AMT, "Insuff. val bal");
 
-        uint hnrAmt = IArtifact(_from).unvouch(msg.sender, VALIDATE_AMT);
+        uint hnrAmt = IArtifact(_from).unvouch(msg.sender, VALIDATE_AMT, true);
         _transfer(_from, addr, hnrAmt);
         IArtifact(addr).receiveDonation();
         return IArtifact(addr).validate();

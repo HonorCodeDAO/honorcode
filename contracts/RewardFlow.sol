@@ -79,7 +79,7 @@ contract RewardFlow is IRewardFlow {
     // uint32 public min_flow_index;
     address public artifactAddr;
     address public gerasAddr;
-    address public stakedAssetAddr;
+    // address public stakedAssetAddr;
     address public rfFactory; 
     // address public honorAddr;
     uint public accumulatedPayout;

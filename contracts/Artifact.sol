@@ -28,20 +28,15 @@ contract Artifact is IArtifact {
     uint public honorWithin;
     // uint public netHonor;
     uint public accHonorHours;
-    // uint public totalIncomingRewardFlow;
     uint public builderHonor;
-    // uint public accReward;
-    // uint public virtualStaked;
     uint private _totalSupply;
     bool public isValidated;
     address public rewardFlow;
 
     uint public constant BUILDER_RATE = 1;
 
-    // mapping (address => mapping (address => uint)) budgets;
 
     mapping (address => uint) private _balances;
-    // mapping (address => uint) private _staked;
 
     // These mappings are necessary to track the relative share of each claim.
     // The reward flows are time-weighted, so they need to be synced together.
@@ -153,8 +148,7 @@ contract Artifact is IArtifact {
       * Given some valid input vouching claim to this artifact, return the output honor. 
     */
     function unvouch(address account, uint unvouchAmt, bool isHonor) external override returns(uint hnrAmt) {
-
-        // require(ISTT(honorAddr).balanceOf(to) != 0, "Invalid vouching target");
+        require(account == msg.sender || msg.sender == honorAddr, 'Only Honor or sender can unvouch');
         updateAccumulated(address(this));
         updateAccumulated(account);
 
@@ -181,8 +175,7 @@ contract Artifact is IArtifact {
         recomputeBuilderVouch();
         honorWithin -= hnrAmt;
         _burn(account, unvouchAmt);
-        // _balances[account] -= unvouchAmt;
-        // // netHonor -= hnrAmt;
+        // netHonor -= hnrAmt;
     }
 
 
@@ -228,29 +221,6 @@ contract Artifact is IArtifact {
     //     _balances[account] -= unvouchAmt;
     // }
 
-    /* 
-     * Only recompute for the specific address, to avoid having to sum everything. 
-     */
-    // function recomputeBudget(address account, address artifactFrom, address artifactTo) private returns (bool computed) {
-    //     uint vouchAmt = _balances[account];
-    //     if (vouchAmt == 0) { return true; }
-    //     return true;
-    // }
-
-    // function setBudget(address account, address artifactFrom, address artifactTo, uint amount) private returns (bool budgetSet) {
-    //     require(budgets[account][artifactFrom] >= amount && amount < 1 << 32);
-    //     require(account == honorAddr || account == msg.sender);
-    //     if (artifactFrom == address(this)) {
-    //         require(budgets[account][artifactFrom] > amount);
-    //     }
-    //     budgets[account][artifactFrom] -= amount;
-    //     budgets[account][artifactTo] += amount;
-    //     return recomputeBudget(account);
-    // }
-
-    // function accumulateReward(uint64 timeElapsed) private {
-    //     accReward += virtualStaked * uint(timeElapsed) / rewardMult;
-    // }
 
     /* 
      * The amount of the vouch claim going to the builder will increase based on the vouched HONOR over time. 

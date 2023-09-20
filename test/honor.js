@@ -1,7 +1,10 @@
 const Honor = artifacts.require("Honor");
 const Artifact = artifacts.require("Artifact");
+const MockCoin = artifacts.require("MockCoin");
 const Artifactory = artifacts.require("Artifactory");
 const { time } = require("@openzeppelin/test-helpers");
+
+/* global BigInt */
 
 advanceTime = (time) => {
   return new Promise((resolve, reject) => {
@@ -21,7 +24,8 @@ contract('Honor', (accounts, deployer) => {
   it('should put 10000 Honor in the first account', async () => {
 
     const ArtiFactoryInstance = await Artifactory.deployed();
-    const HonorInstance = await Honor.new(ArtiFactoryInstance.address);
+    const mockERC = await MockCoin.deployed();
+    const HonorInstance = await Honor.new(ArtiFactoryInstance.address, mockERC.address);
 
     // const ArtifactInstance = await Artifact.deployed();
     const artyAddr = await HonorInstance.rootArtifact.call();
@@ -65,7 +69,8 @@ contract('Honor', (accounts, deployer) => {
   it('should vouch correctly', async () => {
 
     const ArtiFactoryInstance = await Artifactory.deployed();
-    const HonorInstance = await Honor.new(ArtiFactoryInstance.address);    
+    const mockERC = await MockCoin.deployed();
+    const HonorInstance = await Honor.new(ArtiFactoryInstance.address, mockERC.address);
     // const ArtifactInstance = await deployer.deploy(Artifact, accounts[1], HonorInstance.address, 'new artifact');
     // const ArtifactInstance = await Artifact.deployed(accounts[1], HonorInstance.address, 'new artifact');
 
@@ -98,7 +103,10 @@ contract('Honor', (accounts, deployer) => {
     console.log('root vouch ', (await ArtifactInstance.totalSupply.call()).toString());
 
     const newAddr = await HonorInstance.proposeArtifact.call(rootAddr, accountThree, 'new artifact');
-    await HonorInstance.proposeArtifact(rootAddr, accountThree, 'new artifact');
+    const receipt = await HonorInstance.proposeArtifact(rootAddr, accountThree, 'new artifact');
+
+    const gasUsed = receipt.receipt.gasUsed;
+    console.log('Gas to proposeArtifact', gasUsed);
 
     // await HonorInstance.validateArtifact(rootAddr, newAddr);
 
@@ -106,7 +114,8 @@ contract('Honor', (accounts, deployer) => {
     const accountTwoStartingBalance = (await HonorInstance.balanceOf.call(newAddr));//.toNumber();
     assert(accountTwoStartingBalance > 0, 'No HONOR in new address');
 
-    await HonorInstance.vouch(rootAddr, newAddr, 1);
+    const vouchreceipt = await HonorInstance.vouch(rootAddr, newAddr, 1);
+    console.log('Gas to vouchArtifact', vouchreceipt.receipt.gasUsed);
 
     // Get balances of first and second account after the transactions.
     const accountOneEndingBalance = (await HonorInstance.balanceOf.call(rootAddr));//.toNumber();
@@ -133,7 +142,8 @@ contract('Honor', (accounts, deployer) => {
 
     const builderTwo = accounts[2];
     const ArtiFactoryInstance = await Artifactory.deployed();
-    const HonorInstance = await Honor.new(ArtiFactoryInstance.address);
+    const mockERC = await MockCoin.deployed();
+    const HonorInstance = await Honor.new(ArtiFactoryInstance.address, mockERC.address);
 
     const rootAddr = await HonorInstance.rootArtifact.call();
     const rootBalance = await HonorInstance.balanceOf.call(rootAddr);
@@ -149,7 +159,7 @@ contract('Honor', (accounts, deployer) => {
 
     // await HonorInstance.validateArtifact(rootAddr, newAddr);
 
-    await HonorInstance.vouch(rootAddr, newAddr, 1e9);
+    await HonorInstance.vouch(rootAddr, newAddr, '1000000000000000000');
     // const internalHonor = (await HonorInstance.internalHonorBalanceOfArtifact.call(newAddr));//.toNumber();
 
     const builderA = (await HonorInstance.getArtifactBuilder.call(newAddr));
@@ -163,7 +173,7 @@ contract('Honor', (accounts, deployer) => {
 
     const builderEndingBalance = (await HonorInstance.balanceOfArtifact.call(newAddr, builderTwo));
 
-    const expectedBuilderChange =  394803839208783872;
+    const expectedBuilderChange =  2255213797289492480;
     console.log('builderEndingBalance', builderEndingBalance.toString());
 
     const newInstance = await Artifact.at(newAddr);

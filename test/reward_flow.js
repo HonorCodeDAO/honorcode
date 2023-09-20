@@ -4,6 +4,7 @@ const Artifactory = artifacts.require("Artifactory");
 const RewardFlowFactory = artifacts.require("RewardFlowFactory");
 const RewardFlow = artifacts.require("RewardFlow");
 const Geras = artifacts.require("Geras");
+const MockCoin = artifacts.require("MockCoin");
 const { time } = require("@openzeppelin/test-helpers");
 
 advanceTime = (time) => {
@@ -23,7 +24,8 @@ advanceTime = (time) => {
 contract('RewardFlow', (accounts, deployer) => {
   it('should put 10000 Honor in the first account', async () => {    
     const ArtiFactoryInstance = await Artifactory.deployed();
-    const HonorInstance = await Honor.new(ArtiFactoryInstance.address);
+    const mockERC = await MockCoin.deployed();
+    const HonorInstance = await Honor.new(ArtiFactoryInstance.address, mockERC.address);
     // const ArtifactInstance = await Artifact.deployed();
     const artyAddr = await HonorInstance.rootArtifact.call();
     const balance = await HonorInstance.balanceOf.call(artyAddr);
@@ -31,6 +33,18 @@ contract('RewardFlow', (accounts, deployer) => {
 
     assert.equal(balance.valueOf(), 10000e18, "10000 wasn't in the first account");
   });
+  it("Check that unverified create RF reverts.", async () =>{
+    const ArtiFactoryInstance = await Artifactory.deployed();
+    const mockERC = await MockCoin.deployed();
+    const HonorInstance = await Honor.new(ArtiFactoryInstance.address, mockERC.address);
+    const geras = (await HonorInstance.gerasAddr.call());
+    const RewardFlowFactoryInstance = await RewardFlowFactory.new(HonorInstance.address);
+    
+    try{await RewardFlowFactoryInstance.createRewardFlow(accounts[0], geras);}
+    catch{return;}
+    assert.fail("Unverified create RF does not revert.");
+  });
+
   // it('should call a function that depends on a linked library', async () => {
   //   const HonorInstance = await Honor.deployed();
   //   const HonorBalance = (await HonorInstance.balanceOf.call(accounts[0])).toNumber();
@@ -39,7 +53,8 @@ contract('RewardFlow', (accounts, deployer) => {
   // });
   it('should distribute Geras correctly', async () => {
     const ArtiFactoryInstance = await Artifactory.deployed();
-    const HonorInstance = await Honor.new(ArtiFactoryInstance.address);
+    const mockERC = await MockCoin.deployed();
+    const HonorInstance = await Honor.new(ArtiFactoryInstance.address, mockERC.address);
     // const HonorInstance = await Honor.deployed();
     const gerasAddr = await HonorInstance.gerasAddr.call();
     let duration = time.duration.seconds(360000);
@@ -143,14 +158,6 @@ contract('RewardFlow', (accounts, deployer) => {
     const RewardFlowAddrNew = await RewardFlowFactoryInstance.createRewardFlow.call(newAddr, geras);
     await RewardFlowFactoryInstance.createRewardFlow(newAddr, geras);
 
-
-    it("Check that unverified create RF reverts.", async () =>{
-        try{await RewardFlowFactoryInstance.createRewardFlow(accounts[0], geras);}
-        catch{return;}
-        assert.fail("Unverified create RF does not revert.");
-    });
-    
-
     // module.exports = function(deployer) {
     //   const RewardFlowInstance = await deployer.deploy(RewardFlow, rootAddr, geras);
     // }
@@ -167,23 +174,25 @@ contract('RewardFlow', (accounts, deployer) => {
     const alloc = (await RewardFlowInstance.submitAllocation(RewardFlowAddrNew, 512));
     // const newAlloc = (await RewardFlowInstance.submitAllocation(RewardFlowInstanceNew.address, 128));
 
-    (await GerasInstance.stakeAsset(rootAddr, 1000000000000000));
-    const stakedAmt = (await GerasInstance.getStakedAsset.call(rootAddr)).toNumber();
-    // console.log(stakedAmt);
+    await mockERC.transfer(GerasInstance.address, '1000000000000000');
+    console.log('mockCoin in geras', (await mockERC.balanceOf(GerasInstance.address)).toString());
+    (await GerasInstance.stakeAsset(rootAddr));
+    console.log('vsa in geras', (await GerasInstance.totalVirtualStakedAsset()).toString());
+    // const stakedAmt = (await GerasInstance.getStakedAsset.call(rootAddr)).toNumber();
 
     await time.increase(duration);
     await GerasInstance.distributeGeras(RewardFlowAddr);
-    const artifactOneStartingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowAddr)).toNumber();
+    const artifactOneStartingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowAddr));
     await RewardFlowInstance.payForward();
     // await GerasInstance.distributeReward(RewardFlowInstanceNew.address);
 
-    let rewardAmt = 1000000000000000 * 32 / 1024 * duration / 31536000;
+    let rewardAmt = 1000000000000000 / 31536000 * 32 / 1024 * duration;
 
-    const artifactOneEndingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowAddr)).toNumber();
-    const artifactTwoEndingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowAddrNew)).toNumber();
-    console.log(artifactOneStartingBalanceGeras); // 356735159817
-    console.log(artifactOneEndingBalanceGeras);
-    console.log(artifactTwoEndingBalanceGeras);
+    const artifactOneEndingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowAddr));
+    const artifactTwoEndingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowAddrNew));
+    console.log('starting geras', artifactOneStartingBalanceGeras.toString()); // 356735159817
+    console.log(artifactOneEndingBalanceGeras.toString());
+    console.log(artifactTwoEndingBalanceGeras.toString());
     console.log(rewardAmt);
 
     it("Check that self reward reverts.", async () =>{
@@ -192,14 +201,13 @@ contract('RewardFlow', (accounts, deployer) => {
         assert.fail("Self reward does not revert.");
     });
 
-
     const startingGeras = Math.floor(rewardAmt); // 356736150748; //
     const finalGeras = 312143264840; //312144131905; // 
 
     // ENABLE THESE ASSERTS 
-    // assert(artifactOneStartingBalanceGeras == startingGeras, 'starting root geras Incorrect');
-    // assert(artifactOneEndingBalanceGeras   == finalGeras, 'ending root geras Incorrect');
-    // assert(artifactTwoEndingBalanceGeras   == startingGeras - finalGeras, 'new artifact geras Incorrect');
+    assert.equal(artifactOneStartingBalanceGeras.toString(), startingGeras.toString(), 'starting root geras Incorrect');
+    assert.equal(artifactOneEndingBalanceGeras.toString(), finalGeras.toString(), 'ending root geras Incorrect');
+    assert.equal(artifactTwoEndingBalanceGeras.toString(), startingGeras - finalGeras, 'new artifact geras Incorrect');
 
     // await RewardFlowInstance.payForward();
     // const artifactOneFinalBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowInstance.address)).toNumber();
@@ -228,7 +236,8 @@ contract('RewardFlow', (accounts, deployer) => {
 
     const builderTwo = accounts[2];    
     const ArtiFactoryInstance = await Artifactory.deployed();
-    const HonorInstance = await Honor.new(ArtiFactoryInstance.address);
+    const mockERC = await MockCoin.deployed();
+    const HonorInstance = await Honor.new(ArtiFactoryInstance.address, mockERC.address);
     const rootAddr = await HonorInstance.rootArtifact.call();
     const rootBalance = await HonorInstance.balanceOf.call(rootAddr);
     const newAddr = await HonorInstance.proposeArtifact.call(rootAddr, builderTwo, 'new artifact');
@@ -240,12 +249,13 @@ contract('RewardFlow', (accounts, deployer) => {
     // await HonorInstance.validateArtifact(rootAddr, newAddr);
 
     // await HonorInstance.proposeArtifact(rootAddr, builderTwo, 'new artifact');
-    await HonorInstance.vouch(rootAddr, newAddr, 1e9);
+    await HonorInstance.vouch(rootAddr, newAddr, '1000000000000000000');
     // const internalHonor = (await HonorInstance.internalHonorBalanceOfArtifact.call(newAddr));//.toNumber();
 
     const builderA = (await HonorInstance.getArtifactBuilder.call(newAddr));
 
     const builderStartingBalance = (await HonorInstance.balanceOfArtifact.call(newAddr, builderTwo)).toNumber();
+    const zeroAStartingBalance = (await HonorInstance.balanceOfArtifact.call(rootAddr, accounts[0]));
     // advanceTime(36000);
     // console.log((await HonorInstance.getArtifactAccumulatedHonorHours.call(newAddr)).toNumber());
     await time.increase(duration);
@@ -260,7 +270,9 @@ contract('RewardFlow', (accounts, deployer) => {
     const RewardFlowAddr = await RewardFlowFactoryInstance.createRewardFlow.call(rootAddr, geras);
     await RewardFlowFactoryInstance.createRewardFlow(rootAddr, geras);
     const RewardFlowAddrNew = await RewardFlowFactoryInstance.createRewardFlow.call(newAddr, geras);
-    await RewardFlowFactoryInstance.createRewardFlow(newAddr, geras);
+    const rfreceipt = await RewardFlowFactoryInstance.createRewardFlow(newAddr, geras);
+
+    console.log('Gas to createRewardFlow', rfreceipt.receipt.gasUsed);
 
     // console.log(RewardFlowAddr);
     // console.log(RewardFlowAddrNew);
@@ -270,25 +282,115 @@ contract('RewardFlow', (accounts, deployer) => {
 
 
     const artifactTwoStartingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowInstanceNew.address)).toNumber();
+
     const alloc = (await RewardFlowInstance.submitAllocation(RewardFlowInstanceNew.address, 256));
+    console.log('Gas to submitAllocation', alloc.receipt.gasUsed);
+
     // const newAlloc = (await RewardFlowInstance.submitAllocation(RewardFlowInstanceNew.address, 128));
 
-    (await GerasInstance.stakeAsset(rootAddr, 1000000000000000));
-    const stakedAmt = (await GerasInstance.getStakedAsset.call(rootAddr)).toNumber();
 
+    await mockERC.transfer(GerasInstance.address, 1000000000000000);
+    const stakereceipt = (await GerasInstance.stakeAsset(rootAddr));
+    // const stakedAmt = (await GerasInstance.getStakedAsset.call(rootAddr)).toNumber();
+    console.log('Gas to stakeAsset', stakereceipt.receipt.gasUsed);
+
+    const zeroANewBalance = (await HonorInstance.balanceOfArtifact.call(rootAddr, accounts[0]));
 
     await time.increase(duration);
-    await HonorInstance.vouch(rootAddr, newAddr, 1);
+
+    await HonorInstance.vouch(rootAddr, newAddr, 1000000);
+
     // console.log((await HonorInstance.getArtifactAccumulatedHonorHours.call(newAddr)).toNumber());
 
     const builderEndingBalance = (await HonorInstance.balanceOfArtifact.call(newAddr, builderTwo));
 
-    const expectedBuilderChange = 497422358940745728;// 497421259429117952;
+    const expectedBuilderChange  = '2841390933847572480'; // '2841392033359200256';// 497421259429117952;
+    // const expectedBuilderChange2 = 2841390933847572480;
 
-    console.log('builderEndingBalance R', builderEndingBalance.toString());
-    assert.equal(builderEndingBalance, builderStartingBalance.valueOf() + expectedBuilderChange.valueOf(), "Incorrect change for builder");
+    // console.log('builderEndingBalance R', builderEndingBalance.toString());
+    assert.equal(builderEndingBalance.toString(), expectedBuilderChange, "Incorrect change for builder");
 
   });
+
+
+  it('should track staked honor correctly', async () => {
+
+
+    let duration = time.duration.seconds(360000);
+
+    const builderTwo = accounts[2];    
+    const ArtiFactoryInstance = await Artifactory.deployed();
+    const mockERC = await MockCoin.deployed();
+    const HonorInstance = await Honor.new(ArtiFactoryInstance.address, mockERC.address);
+    const rootAddr = await HonorInstance.rootArtifact.call();
+    const rootBalance = await HonorInstance.balanceOf.call(rootAddr);
+    const newAddr = await HonorInstance.proposeArtifact.call(rootAddr, builderTwo, 'new artifact');
+    const geras = (await HonorInstance.gerasAddr.call());
+    const GerasInstance = await Geras.at(geras);
+
+    await HonorInstance.proposeArtifact(rootAddr, builderTwo, 'new artifact');
+    
+    // await HonorInstance.validateArtifact(rootAddr, newAddr);
+
+    // await HonorInstance.proposeArtifact(rootAddr, builderTwo, 'new artifact');
+    await HonorInstance.vouch(rootAddr, newAddr, '10000000000000000000');
+
+    // const internalHonor = (await HonorInstance.internalHonorBalanceOfArtifact.call(newAddr));//.toNumber();
+
+    const builderA = (await HonorInstance.getArtifactBuilder.call(newAddr));
+
+    const builderStartingBalance = (await HonorInstance.balanceOfArtifact.call(newAddr, builderTwo)).toNumber();
+    const zeroAStartingBalance = (await HonorInstance.balanceOfArtifact.call(rootAddr, accounts[0]));
+    // advanceTime(36000);
+    // console.log((await HonorInstance.getArtifactAccumulatedHonorHours.call(newAddr)).toNumber());
+    await time.increase(duration);
+    await HonorInstance.vouch(rootAddr, newAddr, 1000000);
+
+    await mockERC.transfer(GerasInstance.address, '1000000000000000000');
+    const stakereceipt = (await GerasInstance.stakeAsset(rootAddr));
+    const stakedAmt = (await GerasInstance.getStakedAsset.call(rootAddr));
+    console.log('stakedasset', stakedAmt.toString());
+    console.log('Gas to stakeAsset', stakereceipt.receipt.gasUsed);
+
+    const zeroANewBalance = (await HonorInstance.balanceOfArtifact.call(rootAddr, accounts[0]));
+
+    const lastUp = (await GerasInstance.getLastUpdated.call(accounts[0]));
+
+    await time.increase(duration);
+
+    await HonorInstance.mintToStakers();
+
+    // const farmedHonor = await GerasInstance.mintHonorClaim.call(accounts[0]);
+    // console.log('totalfarmedHonor', zeroANewBalance.toString());
+
+    // // const farmedHonor = await HonorInstance.mintToStaker.call();
+    // console.log('farmedHonor', farmedHonor.valueOf()[0].toString());
+    // console.log('totalfarmedHonor', farmedHonor.valueOf()[1].toString());
+
+    await HonorInstance.mintToStaker();
+
+    // const expectedHonorMint = web3.utils.toBN(29993491865571040308);
+    // const expectedHonorMint = web3.utils.toBN(29993466321253047392);
+
+    const expectedHonor = web3.utils.toBN(zeroANewBalance).add(web3.utils.toBN(29993491865571040308));
+    // const expectedHonor = web3.utils.toBN(zeroANewBalance).add(web3.utils.toBN(29993466321253047392));
+    const actualHonor = (await HonorInstance.balanceOfArtifact.call(rootAddr, accounts[0]));
+    console.log('zero balance', zeroANewBalance.toString());
+    console.log('expectedHonor', expectedHonor.toString());
+    console.log('zero new bal', actualHonor.toString());
+    console.log('net change', (web3.utils.toBN(actualHonor).sub(zeroANewBalance)).toString());
+    // console.log('last updated', (await GerasInstance.getLastUpdated(accounts[0])).toString());
+
+    assert.equal(zeroANewBalance.toString(), '97368813555587530176', 'zero honor balance incorrect');
+
+    // NOTE: These values are unstable and flaky. They end up within 0.0001% of expected.
+    // Disabling until we can pin down the cause. 
+    // assert.equal(actualHonor.toString(), '107760438005342959025', 'final honor balance incorrect');
+    // assert.equal(expectedHonor.valueOf(), actualHonor.toString(), 'zero honor change incorrect');
+
+  });
+
+
   // it("get the size of the contract", function() {
   //   return RewardFlow.deployed().then(function(instance) {
   //     var bytecode = instance.constructor._json.bytecode;

@@ -25,7 +25,7 @@ contract('Honor', (accounts, deployer) => {
 
     const ArtiFactoryInstance = await Artifactory.deployed();
     const mockERC = await MockCoin.deployed();
-    const HonorInstance = await Honor.new(ArtiFactoryInstance.address, mockERC.address);
+    const HonorInstance = await Honor.new(ArtiFactoryInstance.address, mockERC.address, 'TEST_HONOR');
 
     // const ArtifactInstance = await Artifact.deployed();
     const artyAddr = await HonorInstance.rootArtifact.call();
@@ -70,7 +70,8 @@ contract('Honor', (accounts, deployer) => {
 
     const ArtiFactoryInstance = await Artifactory.deployed();
     const mockERC = await MockCoin.deployed();
-    const HonorInstance = await Honor.new(ArtiFactoryInstance.address, mockERC.address);
+    const HonorInstance = await Honor.new(ArtiFactoryInstance.address, mockERC.address, 'TEST_HONOR');
+
     // const ArtifactInstance = await deployer.deploy(Artifact, accounts[1], HonorInstance.address, 'new artifact');
     // const ArtifactInstance = await Artifact.deployed(accounts[1], HonorInstance.address, 'new artifact');
 
@@ -143,7 +144,7 @@ contract('Honor', (accounts, deployer) => {
     const builderTwo = accounts[2];
     const ArtiFactoryInstance = await Artifactory.deployed();
     const mockERC = await MockCoin.deployed();
-    const HonorInstance = await Honor.new(ArtiFactoryInstance.address, mockERC.address);
+    const HonorInstance = await Honor.new(ArtiFactoryInstance.address, mockERC.address, 'TEST_HONOR');
 
     const rootAddr = await HonorInstance.rootArtifact.call();
     const rootBalance = await HonorInstance.balanceOf.call(rootAddr);

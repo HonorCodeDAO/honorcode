@@ -13,6 +13,7 @@ interface IArtifact {
     function receiveDonation() external returns(uint);
     function honorWithin() external view returns(uint);
     function honorAddr() external view returns(address);
+    function location() external view returns(string memory);
     // function getNetHonor() external view returns(uint);
     function builder() external view returns(address);
     function accHonorHours() external view returns(uint);

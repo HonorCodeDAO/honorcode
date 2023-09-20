@@ -18,47 +18,38 @@ import "./SafeMath.sol";
 // and manages the cash flow collection and resulting HONOR mints.
 
 contract Honor is ISTT {
+    uint private _totalSupply;
+    uint private _stakingMintPool;
     mapping (address => uint) private _balances;
-    // mapping (address => uint) private _stakedAsset;
-    // mapping (address => uint) private _accStakingRewards;
-    // mapping (address => uint32) private _lastUpdated;
-    // mapping (address => ArtifactData.data) artifacts;
     uint private _lastUpdated;
     address public rootArtifact;
     // Assumed to be a liquid staking asset.
-    address public stakedAssetAddr; // = address(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
+    address public stakedAssetAddr;
     address public gerasAddr;
     address public rewardFlowFactory;
     address public owner;
-    uint private _totalSupply;
-    uint private _stakingMintPool;
     uint constant VALIDATE_AMT = 1e18;
-    // uint32 constant public INFLATION_PER_THOUSAND_PER_YEAR_STAKER = 500;
-    // uint32 constant public INFLATION_PER_THOUSAND_PER_YEAR_VOUCHER = 500;
-    uint32 constant public EXPECTED_REWARD_PER_YEAR_PER_THOUSAND_STAKED = 32;
-    // address public latestProposed;
     address public artifactoryAddr;
-    // RewardFlowFactory rfFact;
-    // GerasFactory gFact;
+    string public name; 
 
 
-    constructor(address artifactoryAddress, address stakedAssetAddress) {
+    constructor(
+        address artifactoryAddress, 
+        address stakedAssetAddress, 
+        string memory honorName) {
         artifactoryAddr = artifactoryAddress;
-        // rfFact = new RewardFlowFactory();
-        // gFact = new GerasFactory();
-        // Artifact root = new Artifact(tx.origin, address(this), "rootArtifact");
-        rootArtifact = (IArtifactory(artifactoryAddr).createArtifact(tx.origin, address(this), "rootArtifact"));
-        // gerasAddr = address(gFact.createGeras(rootArtifact, address(this)));
-        gerasAddr = address(new Geras(rootArtifact, address(this), stakedAssetAddress));
+        rootArtifact = (IArtifactory(artifactoryAddr).createArtifact(
+            tx.origin, address(this), "rootArtifact"));
+        gerasAddr = address(new Geras(rootArtifact, address(this), 
+            stakedAssetAddress));
 
         _mint(rootArtifact, 10000e18);
-        // IArtifact(rootArtifact).vouch(tx.origin);
-        // require(_balances[rootArtifact] > 0, "root balance 0");
         IArtifact(rootArtifact).initVouch(msg.sender, 10000e18);
+
         IArtifact(rootArtifact).validate();
-        _balances[rootArtifact] = 10000e18;
         stakedAssetAddr = stakedAssetAddress;
         owner = msg.sender;
+        name = honorName;
     }
 
     function setRewardFlowFactory() external override {
@@ -66,19 +57,17 @@ contract Honor is ISTT {
         rewardFlowFactory = msg.sender;
     }
 
-    // function initializeRF() external returns(address) {
-    //     return rewardFlowFactory;
-    // }
-
     function balanceOf(address addr) public view returns(uint) {
         return _balances[addr]; 
     }
 
-    function balanceOfArtifact(address addr, address account) public view returns(uint) {
+    function balanceOfArtifact(address addr, address account) 
+    public view returns(uint) {
         return IArtifact(addr).balanceOf(account);
     }
 
-    function internalHonorBalanceOfArtifact(address addr) public view returns(uint) {
+    function internalHonorBalanceOfArtifact(address addr) 
+    public view returns(uint) {
         return IArtifact(addr).honorWithin();
     }
     
@@ -86,7 +75,8 @@ contract Honor is ISTT {
         return IArtifact(addr).builder();
     }
 
-    function getArtifactAccumulatedHonorHours(address addr) public view returns(uint) {
+    function getArtifactAccumulatedHonorHours(address addr) 
+    public view returns(uint) {
         return IArtifact(addr).accHonorHours();
     }
 
@@ -100,15 +90,19 @@ contract Honor is ISTT {
      * This includes checking whether the destination is validated, and overseeing the 
      * transfer of base HONOR. 
      */ 
-    function vouch(address _from, address _to, uint amount) public returns(uint revouchAmt) {
-        require(_balances[_to] != 0 && _balances[_from] != 0 && IArtifact(_to).isValidated(), 
+    function vouch(address _from, address _to, uint amount) public returns(
+        uint revouchAmt) {
+        require(_balances[_to] != 0 && _balances[_from] != 0 && (
+            IArtifact(_to).isValidated()), 
             "Inval vouch");
-        require(IArtifact(_from).balanceOf(msg.sender) >= amount, "HONOR: Insuff. vouch bal");
+        require(IArtifact(_from).balanceOf(msg.sender) >= amount, 
+            "HONOR: Insuff. vouch bal");
 
         uint hnrAmt = IArtifact(_from).unvouch(msg.sender, amount, false);
         _transfer(_from, _to, hnrAmt);
 
-        require(IArtifact(_from).honorAddr() == address(this), 'artifact doesnt exist');
+        require(IArtifact(_from).honorAddr() == address(this), 
+            'artifact doesnt exist');
         revouchAmt = IArtifact(_to).vouch(msg.sender); 
 
         emit Vouch(msg.sender, _from, _to, hnrAmt);
@@ -117,13 +111,15 @@ contract Honor is ISTT {
     /* 
      * Propose adding a new artifact that refers to certain link or document. 
      */ 
-    function proposeArtifact(address _from, address builder, string memory location) public returns(address proposedAddr) { 
+    function proposeArtifact(address _from, address builder, string memory loc) 
+    public returns(address proposedAddr) { 
         // We'll check if sender has a positive balance but will still fail below if insufficient
-        require(IArtifact(_from).balanceOf(msg.sender) > 0, "Insuff. proposer/source bal");
+        require(IArtifact(_from).balanceOf(msg.sender) > 0, 
+            "Insuff. proposer/source bal");
         // require(balanceOf(msg.sender) >= VALIDATE_AMT, "Insuff. proposer bal");
-        proposedAddr = (IArtifactory(artifactoryAddr).createArtifact(builder, address(this), location));
+        proposedAddr = (IArtifactory(artifactoryAddr).createArtifact(
+            builder, address(this), loc));
 
-        // return proposedAddr;
         uint hnrAmt = IArtifact(_from).unvouch(msg.sender, VALIDATE_AMT, true);
         // uint hnrAmt = vouch(_from, proposedAddr, VALIDATE_AMT);
         // uint hnrAmt = 1;
@@ -136,13 +132,15 @@ contract Honor is ISTT {
     }
 
     /* 
-     * After an artifact is proposed, it will need to be validated to be fully vouchable.
-     * This process should involve some version of token curation but for now requires 
-     * additional HONOR lockup. 
+     * After an artifact is proposed, it will need to be validated to be fully 
+     * vouchable. This process should involve some version of token curation but 
+     * for now requires additional HONOR lockup. 
      */
-    function validateArtifact(address _from, address addr) public returns(bool validated) { 
-        if (IArtifact(addr).isValidated() && _balances[addr] > 0) { return true; }
-        require(IArtifact(_from).balanceOf(msg.sender) >= VALIDATE_AMT, "Insuff. val bal");
+    function validateArtifact(address _from, address addr) 
+    public returns(bool validated) { 
+        if (IArtifact(addr).isValidated() && _balances[addr] > 0) {return true;}
+        require(IArtifact(_from).balanceOf(msg.sender) >= VALIDATE_AMT, 
+            "Insuff. val bal");
 
         uint hnrAmt = IArtifact(_from).unvouch(msg.sender, VALIDATE_AMT, true);
         _transfer(_from, addr, hnrAmt);
@@ -159,21 +157,25 @@ contract Honor is ISTT {
     }
 
     /*
-        We compute the rate at which HONOR is farmed out from a square root of the total 
-        amount of VSA staked. 
+     *  We compute the rate at which HONOR is farmed out from a square root of 
+     *  the total amount of VSA staked. The pivot point where the annual rate
+     *  equals staked asset is 2^70 (~1000 ETH). 
     */
     function mintToStakers() public returns(uint farmedHonor) {
-
-        uint stakeAmtSqrt = SafeMath.floorSqrt(IGeras(gerasAddr).totalVirtualStakedAsset()) << 35;
-        farmedHonor = ((block.timestamp - _lastUpdated) * stakeAmtSqrt) / 31536000;
+        uint stakeAmt = SafeMath.floorSqrt(
+            IGeras(gerasAddr).totalVirtualStakedAsset()) << 35;
+        // Will be minted at an annual rate.
+        farmedHonor = ((block.timestamp - _lastUpdated) * stakeAmt) / 31536000;
         _lastUpdated = block.timestamp;
         _stakingMintPool += farmedHonor;
     }
 
     function mintToStaker() public returns(uint farmedHonor) {
         uint totalFarmedHonor;
-        (farmedHonor, totalFarmedHonor) = IGeras(gerasAddr).mintHonorClaim(msg.sender);
-        require(totalFarmedHonor > 0 && farmedHonor > 0, 'No farmed Honor available');
+        (farmedHonor, totalFarmedHonor) = IGeras(gerasAddr).mintHonorClaim(
+            msg.sender);
+        require(totalFarmedHonor > 0 && farmedHonor > 0, 
+            'No farmed Honor available');
         uint hnrToMint = farmedHonor * _stakingMintPool / totalFarmedHonor;
         hnrToMint = SafeMath.min(hnrToMint, _stakingMintPool);
         _stakingMintPool -= hnrToMint;
@@ -181,7 +183,8 @@ contract Honor is ISTT {
         IArtifact(rootArtifact).vouch(msg.sender);
     }
 
-    function _transfer(address sender, address recipient, uint256 amount) internal virtual {
+    function _transfer(address sender, address recipient, uint256 amount) 
+    internal virtual {
         // require(sender != address(0), "HONOR: tfer from zero");
         // require(recipient != address(0), "HONOR: tfer to zero");
         // require(IArtifact(recipient).isValidated(), 'recipient not validated');
@@ -195,6 +198,10 @@ contract Honor is ISTT {
     }
 }
 
+
+// Geras represents the "spoils" of HONOR. It is used to hold the staked asset,
+// tracking the farmed HONOR claims for stakers, and disperse cash flow rewards
+// to vouch holders across the various artifacts, including root. 
 contract Geras is IGeras {
     mapping (address => uint) private _balances;
     // mapping (address => uint) private _claims;
@@ -203,7 +210,7 @@ contract Geras is IGeras {
     // mapping (address => ArtifactData.data) artifacts;
     address public honorAddr;
     address public rootArtifact;
-    address public stakedAssetAddr;// = address(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
+    address public stakedAssetAddr;
     uint public totalVirtualStakedAsset;
     uint public totalVirtualStakedReward;
     uint public redeemableReward;
@@ -217,13 +224,6 @@ contract Geras is IGeras {
     mapping (address => uint) private _accHonorClaims;
     mapping (address => uint) private _lastUpdatedStake;
 
-    uint32 constant public STAKED_ASSET_CONVERSION = 1;
-    uint32 constant public EXPECTED_REWARD_PER_YEAR_PER_THOUSAND_STAKED = 32;
-    // uint32 constant public STAKED_ASSET_CONVERSION = 1;
-
-
-    // event Vouch(address _account, address indexed _from, address indexed _to, uint256 _value);
-    // event Stake(address _account, address indexed _to, uint256 _value);
 
     constructor(address root, address hnrAddr, address stakedAssetAddress) {
         rootArtifact = root;
@@ -234,9 +234,12 @@ contract Geras is IGeras {
     }
 
     function updateHonorClaims(address account) private {
-        require(totalVirtualStakedAsset >= _stakedAssetBalances[account], 'total staked < acct bal');
-        _accHonorClaims[address(this)] += totalVirtualStakedAsset * (block.timestamp - _lastUpdatedStake[address(this)]);
-        _accHonorClaims[account] += _stakedAssetBalances[account] * (block.timestamp - _lastUpdatedStake[msg.sender]);
+        require(totalVirtualStakedAsset >= _stakedAssetBalances[account], 
+            'total staked < acct bal');
+        _accHonorClaims[address(this)] += totalVirtualStakedAsset * (
+            block.timestamp - _lastUpdatedStake[address(this)]);
+        _accHonorClaims[account] += _stakedAssetBalances[account] * (
+            block.timestamp - _lastUpdatedStake[msg.sender]);
         _lastUpdatedStake[account] = block.timestamp;
         _lastUpdatedStake[address(this)] = block.timestamp;
     }
@@ -248,7 +251,8 @@ contract Geras is IGeras {
     function stakeAsset(address stakeTarget) public override returns (uint) {
         require(stakeTarget == rootArtifact, 'Only stake with root artifact');
         uint totalStaked = IERC20(stakedAssetAddr).balanceOf(address(this));
-        require(totalVirtualStakedAsset < totalStaked, 'Transfer asset to stake');
+        require(totalVirtualStakedAsset < totalStaked, 
+            'No asset transferred to stake');
 
         uint amt = totalStaked - totalVirtualStakedAsset;
         if (_stakedAsset[stakeTarget] == 0) {_stakedAsset[stakeTarget] = amt;}
@@ -263,26 +267,26 @@ contract Geras is IGeras {
         return _stakedAsset[stakeTarget];
     }
 
-    function getStakedAsset(address stakeTarget) external override view returns (uint) {
+    function getStakedAsset(address stakeTarget) external override view 
+    returns (uint) {
         return _stakedAsset[stakeTarget];
     }
 
-    function getHonorClaim(address account) external override view returns (uint) {
-        return _accHonorClaims[account];
+    function getHonorClaim(address acct) external override view returns (uint) {
+        return _accHonorClaims[acct];
     }
 
-    function getLastUpdated(address account) external override view returns (uint) {
-        return _lastUpdatedStake[account];
+    function getLastUpdated(address acct) external override view returns (uint){
+        return _lastUpdatedStake[acct];
     }
 
     function mintHonorClaim(address account) external override returns (
         uint accVSASeconds, uint accVSASecondsTotal) {
-        // require(msg.sender == honorAddr, 'Only Honor contract can mint.');
+        require(msg.sender == honorAddr, 'Only Honor contract can mint.');
         updateHonorClaims(account);
         accVSASeconds = _accHonorClaims[account];
         accVSASecondsTotal = _accHonorClaims[address(this)];
-        // require(accVSASecondsTotal >= accVSASeconds, 'total honor claims insufficient');
-        accVSASeconds = SafeMath.min(accVSASeconds, _accHonorClaims[address(this)]);
+        accVSASeconds = SafeMath.min(accVSASeconds, accVSASecondsTotal);
         _accHonorClaims[address(this)] -= accVSASeconds;
         _accHonorClaims[account] = 0;
         _lastUpdatedStake[account] = block.timestamp;
@@ -302,10 +306,11 @@ contract Geras is IGeras {
 
     function distributeGeras(address rewardFlowAddr) public {
         // For now, only root artifact can generate Geras.
-        require(IRewardFlow(rewardFlowAddr).artifactAddr() == rootArtifact, 'Only stake with root artifact');
+        require(IRewardFlow(rewardFlowAddr).artifactAddr() == rootArtifact, 
+            'Only stake with root artifact');
         uint32 timeElapsed = uint32(block.timestamp) - _lastUpdated;
 
-        uint newGeras = _stakedAsset[rootArtifact] * EXPECTED_REWARD_PER_YEAR_PER_THOUSAND_STAKED / 1024;
+        uint newGeras = _stakedAsset[rootArtifact] * 32 / 1024;
         _lastUpdated = uint32(block.timestamp);
         _mint(rewardFlowAddr, timeElapsed * newGeras / 31536000); 
         // IRewardFlow(rewardFlowAddr).payForward();
@@ -328,7 +333,8 @@ contract Geras is IGeras {
     //     // IRewardFlow(rewardFlowAddr).payForward();
     // }
 
-    function transfer(address sender, address recipient, uint256 amount) public virtual {
+    function transfer(address sender, address recipient, uint256 amount) 
+    public virtual {
         // require(sender != address(0), "GERAS: transfer from the zero address");
         // require(recipient != address(0), "GERAS: transfer to the zero address");
         require(IArtifact(IRewardFlow(sender).artifactAddr()).isValidated() && (

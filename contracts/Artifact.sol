@@ -24,9 +24,9 @@ contract Artifact is IArtifact {
     string public location; 
     address public honorAddr;
     address public builder;
-    // uint public antihonorWithin;
+    uint public antihonorWithin;
     uint public honorWithin;
-    // uint public netHonor;
+    int public netHonor;
     uint public accHonorHours;
     uint public builderHonor;
     uint private _totalSupply;
@@ -75,7 +75,7 @@ contract Artifact is IArtifact {
     }
 
     /** 
-      * Keep a time-weighted record of the vouch claims of each vouching address. 
+      * Keep time-weighted record of the vouch claims of each vouching address. 
       * These will be updated asynchronously, although the total will always 
       * have the correct value since we know the total supply.
     */
@@ -180,15 +180,11 @@ contract Artifact is IArtifact {
 
 
     /** 
-      * Given some input honor to this artifact, return the output vouch amount. 
+      * Given some input antihonor to this artifact, return the output vouch amount. 
     */
-    // function antivouch(address account) external override returns(uint vouchAmt) {
+    function antivouch(address account) external override returns(uint vouchAmt) {
     //     uint totalHonor = ISTT(honorAddr).balanceOf(address(this));
     //     uint deposit = SafeMath.sub(totalHonor, honorWithin + antihonorWithin);
-
-    //     // uint honorCbrt = SafeMath.floorCbrt(totalHonor);
-    //     // uint prevHonorCbrt = SafeMath.floorCbrt(honorWithin);
-    //     // vouchAmt = SafeMath.sub(honorCbrt * honorCbrt, prevHonorCbrt * prevHonorCbrt);
 
     //     vouchAmt = SafeMath.sub(SafeMath.floorSqrt(totalHonor), SafeMath.floorSqrt(honorWithin));
 
@@ -197,14 +193,15 @@ contract Artifact is IArtifact {
     //     recomputeBuilderVouch();
     //     antihonorWithin += deposit;
     //     netHonor -= deposit;
-
-    // }
+        require(false, 'antivouch unimplemented.');
+        return 0;
+    }
 
 
     /** 
       * Given some valid input vouching claim to this artifact, return the output honor. 
     */
-    // function unantivouch(address account, address to, uint unvouchAmt) external returns(uint hnrAmt) {
+    function unantivouch(address account, uint unvouchAmt, bool isHonor) external override returns(uint hnrAmt) {
 
     //     require(_balances[account] >= unvouchAmt, "Insufficient vouching balance");
     //     // require(ISTT(honorAddr).balanceOf(to) != 0, "Invalid vouching target");
@@ -219,7 +216,10 @@ contract Artifact is IArtifact {
     //     netHonor += hnrAmt;
     //     _burn(account, unvouchAmt);
     //     _balances[account] -= unvouchAmt;
-    // }
+
+        require(false, 'unantivouch unimplemented.');
+        return 0;
+    }
 
 
     /* 
@@ -249,10 +249,12 @@ contract Artifact is IArtifact {
     }
 
     function setRewardFlow() external override returns(address rewardFlow) {
-        require(rewardFlow == address(0), 'Artifact rewardFlow already set ');
-
+        require(rewardFlow == address(0), 'Artifact rewardFlow already set');
+        require(ISTT(honorAddr).rewardFlowFactory() == IRewardFlow(
+            msg.sender).rfFactory(), 'Invalid rewardFlowFactory');
         require(IRewardFlowFactory(IRewardFlow(
-            msg.sender).rfFactory()).getArtiToRF(address(this)) == msg.sender, "RF/artifact pair don't match");
+            msg.sender).rfFactory()).getArtiToRF(address(this)) == msg.sender, 
+        "RF/artifact pair don't match");
 
         rewardFlow = msg.sender;
     }

@@ -6,6 +6,8 @@ interface IArtifact {
     function initVouch(address account, uint inputHonor) external returns(uint);
     function vouch(address account) external returns (uint256);
     function unvouch(address account, uint256 unvouchAmt, bool isHonor) external returns(uint256);
+    function antivouch(address account) external returns(uint);
+    function unantivouch(address account, uint unvouchAmt, bool isHonor) external returns(uint);
     function isValidated() external view returns(bool);
     function validate() external returns(bool);
     function receiveDonation() external returns(uint);

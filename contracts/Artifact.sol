@@ -36,7 +36,6 @@ contract Artifact is IArtifact {
     uint public builderHonor;
     bool public isValidated;
     address public rewardFlow;
-    uint public constant BUILDER_RATE = 1;
 
 
     constructor(
@@ -228,7 +227,7 @@ contract Artifact is IArtifact {
         uint64 timeElapsed = uint32(block.timestamp) - _lastUpdated;
         uint newHonorQtrs = (uint(timeElapsed) * honorWithin) / 7776000;
         newBuilderVouchAmt = (SafeMath.floorCbrt(
-            (accHonorHours + newHonorQtrs) / BUILDER_RATE) << 40) - (
+            (accHonorHours + newHonorQtrs)) << 40) - (
             SafeMath.floorCbrt(accHonorHours) << 40);
         accHonorHours += newHonorQtrs;
         _lastUpdated = uint32(block.timestamp);

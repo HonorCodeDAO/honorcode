@@ -2,7 +2,9 @@ const Honor = artifacts.require("Honor");
 const Artifact = artifacts.require("Artifact");
 const MockCoin = artifacts.require("MockCoin");
 const Artifactory = artifacts.require("Artifactory");
+const HonorFactory = artifacts.require("HonorFactory"); 
 const { time } = require("@openzeppelin/test-helpers");
+
 
 /* global BigInt */
 
@@ -24,6 +26,7 @@ contract('Honor', (accounts, deployer) => {
   it('should put 10000 Honor in the first account', async () => {
 
     const ArtiFactoryInstance = await Artifactory.deployed();
+    const HonorFactoryInstance = await HonorFactory.deployed();
     const mockERC = await MockCoin.deployed();
     const HonorInstance = await Honor.new(ArtiFactoryInstance.address, mockERC.address, 'TEST_HONOR');
 

@@ -2,8 +2,8 @@
 // Tells the Solidity compiler to compile only from v0.8.13 to v0.9.0
 pragma solidity ^0.8.13;
 
+import "./BQueue.sol";
 import "./SafeMath.sol";
-import "./BudgetQueue.sol";
 import "../interfaces/IArtifact.sol";
 import "../interfaces/IGeras.sol";
 import "../interfaces/ISTT.sol";
@@ -74,7 +74,7 @@ contract RewardFlow is IRewardFlow {
     // uint32 constant public RATE_TO_ACCRUE = 100000;
     uint32 constant public MAX_ALLOC = 1024;
 
-    BudgetQueue private bq;
+    BudgetQ private bq;
     address public artifactAddr;
     address public gerasAddr;
     address public rfFactory; 
@@ -92,7 +92,7 @@ contract RewardFlow is IRewardFlow {
         rfFactory = msg.sender;
         // Default is to keep all flow to this artifact.
         _lastUpdated = uint32(block.timestamp);
-        bq = new BudgetQueue(address(this));
+        BQueue.incrementFirst(bq);
     }
 
     function setArtifact() external override {
@@ -106,14 +106,14 @@ contract RewardFlow is IRewardFlow {
     function payForward() external override returns (
         address target, uint rewardAmt) {
         // receiveVSR();
-        if (bq.isEmpty()) { return (address(this), 0);}
-        address rewarderAddr = bq.peek();
+        if (BQueue.isEmpty(bq)) { return (address(this), 0);}
+        address rewarderAddr = BQueue.peek(bq);
         IArtifact artifact_ = IArtifact(artifactAddr);
         uint nextV = artifact_.balanceOf(rewarderAddr);
 
         if (nextV == 0 || allocations[rewarderAddr].amount == 0 || (
             positions[rewarderAddr] == 0)) {
-            bq.dequeue();
+            BQueue.dequeue(bq);
             return (address(this), 0);
         }
         target = allocations[rewarderAddr].target; 
@@ -129,7 +129,7 @@ contract RewardFlow is IRewardFlow {
         // availableReward -= amtToMove;
         accumulatedPayout += amtToMove * (MAX_ALLOC - alloc) / MAX_ALLOC;
 
-        bq.requeue();
+        BQueue.requeue(bq);
         if ((block.timestamp * amtToMove * 187) % 3 == 1) {
             IRewardFlow(target).payForward();
         }
@@ -169,8 +169,8 @@ contract RewardFlow is IRewardFlow {
             queuePosition = positions[msg.sender];
         }
         else {
-            queuePosition = bq.getNextPos();
-            bq.enqueue(msg.sender);
+            queuePosition = BQueue.getNextPos(bq);
+            BQueue.enqueue(bq, msg.sender);
             positions[msg.sender] = queuePosition;
         }
 

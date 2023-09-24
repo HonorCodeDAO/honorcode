@@ -369,8 +369,6 @@ contract('RewardFlow', (accounts, deployer) => {
     assert.equal(builderEndingBalance.toString(), expectedBuilderChange, "Incorrect change for builder");
 
 
-
-
   });
 
 

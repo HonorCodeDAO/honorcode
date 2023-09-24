@@ -24,7 +24,7 @@ contract Geras is IGeras {
     uint public claimableReward;
 
     // Percentage of 1024
-    // uint public claimableConversionRate = 128;
+    uint public claimableConversionRate = 1024;
     uint private _totalSupply;
     uint32 private _lastUpdated;
 
@@ -115,28 +115,53 @@ contract Geras is IGeras {
             'Only stake with root artifact');
         uint32 timeElapsed = uint32(block.timestamp) - _lastUpdated;
 
+        // Assume new Geras accumulates at a rate of ~3% per year per unit VSA.
         uint newGeras = _stakedAsset[rootArtifact] * 32 / 1024;
         _lastUpdated = uint32(block.timestamp);
         _mint(rewardFlowAddr, timeElapsed * newGeras / 31536000); 
         // IRewardFlow(rewardFlowAddr).payForward();
     }
 
-    // function distributeReward(uint amountToDistribute) public {
-    //     // For now, only owner can distribute the staked asset for Geras.
-    //     require(msg.sender == ISTT(honorAddr).owner(), 'Only owner can distributeReward');
-    //     require(amountToDistribute <= IERC20(stakedAssetAddr).balanceOf(address(this)));
-    //     claimableReward += amountToDistribute;
-    //     // IRewardFlow(rewardFlowAddr).payForward();
-    // }
+    /* 
+        The owner decides how much of the staked asset rewards to distribute,
+        with the understanding it doesn't exceed existing claims on the 
+        staked asset.
+    */
+    function distributeReward(uint amountToDistribute, uint rate) public {
+        // For now, only owner can distribute the staked asset for Geras.
+        require(msg.sender == ISTT(honorAddr).owner(), 
+            'Only owner can distributeReward');
+        require(claimableReward + amountToDistribute <= IERC20(
+            stakedAssetAddr).balanceOf(address(this)) - totalVirtualStakedAsset,
+            'Geras: payout xceeds VSA rewards'
+        );
+        claimableReward += amountToDistribute;
+        claimableConversionRate = rate;
+        // IRewardFlow(rewardFlowAddr).payForward();
+    }
 
+    /*
+        Each RewardFlow instance has some Geras claim, and it can interact with
+        this contract to convert the claim into rewards from the staked-asset.  
+        Since we don't know exactly when the Geras was received, we'll have to 
+        treat it all equally and convertable at the current rate.
+        We assume that the RewardFlow address who makes this request has already
+        verified the claimer deserves the amount. 
+    */
+    function claimReward(uint gerasClaim, address claimer) public 
+    returns (uint vsrClaim) {
+        // Burn some of the address's geras claims.
+        require(gerasClaim <= _balances[msg.sender], 'Geras claim exceeds bal');
+        vsrClaim = gerasClaim * claimableConversionRate / 1024;
 
-    // function claimReward(uint amountToDistribute) public {
-    //     // Burn some of the address's geras claims.
-    //     // require(msg.sender == ISTT(honorAddr).owner(), 'Only owner can distributeReward');
-    //     require(amountToDistribute <= IERC20(stakedAssetAddr).balanceOf(address(this)));
-    //     claimableReward -= amountToDistribute;
-    //     // IRewardFlow(rewardFlowAddr).payForward();
-    // }
+        require(vsrClaim <= claimableReward, 'Claim reward exceeds claimable');
+        require(vsrClaim <= IERC20(stakedAssetAddr).balanceOf(address(this)), 
+            'Insufficient VSA to claim reward');
+
+        claimableReward -= vsrClaim;
+        _burn(msg.sender, gerasClaim);
+        IERC20(stakedAssetAddr).transfer(claimer, vsrClaim);
+    }
 
     function transfer(address sender, address recipient, uint256 amount) 
     public virtual {
@@ -159,4 +184,16 @@ contract Geras is IGeras {
         _balances[account] += amount;
         emit Transfer(address(0), account, amount);
     }
+
+    function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "Geras: burn from zero");
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "Geras: burn exceeds bal");
+        _balances[account] = accountBalance - amount;
+        _totalSupply -= amount;
+
+        emit Transfer(account, address(0), amount);
+    }
+
 }

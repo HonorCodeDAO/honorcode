@@ -90,9 +90,7 @@ contract RewardFlow is IRewardFlow {
         artifactAddr = artifactAddr_;
         gerasAddr = gerasAddr_;
         rfFactory = msg.sender;
-        // stakedAssetAddr = stakedAssetAddr_;
         // Default is to keep all flow to this artifact.
-        // budgetFlow[address(this)] = 1 << 32 - 1;
         _lastUpdated = uint32(block.timestamp);
         bq = new BudgetQueue(address(this));
     }
@@ -105,8 +103,9 @@ contract RewardFlow is IRewardFlow {
     // Formula is: (H_i/Sum_j(H) * accumulated / F)
     // where F is the constant FRACTION_TO_PASS, resulting in exponential decay:
     // (1 - 1/(F H_i/Sum_j(H))) ^ T. 
-    function payForward() external returns (address target, uint rewardAmt) {
-        receiveVSR();
+    function payForward() external override returns (
+        address target, uint rewardAmt) {
+        // receiveVSR();
         if (bq.isEmpty()) { return (address(this), 0);}
         address rewarderAddr = bq.peek();
         IArtifact artifact_ = IArtifact(artifactAddr);
@@ -123,25 +122,25 @@ contract RewardFlow is IRewardFlow {
         // uint32 timeElapsed = uint32(block.timestamp) - _lastUpdated;
         // uint amtToMove = SafeMath.max(availableReward, availableReward * timeElapsed / RATE_TO_ACCRUE);
 
-        uint amtToMove = availableReward * nextV / (
+        uint amtToMove = IGeras(gerasAddr).balanceOf(address(this)) * nextV / (
             artifact_.totalSupply() * FRACTION_TO_PASS);
         rewardAmt = amtToMove * alloc / MAX_ALLOC;
         IGeras(gerasAddr).transfer(address(this), target, rewardAmt);
-        availableReward -= amtToMove;
+        // availableReward -= amtToMove;
         accumulatedPayout += amtToMove * (MAX_ALLOC - alloc) / MAX_ALLOC;
 
         bq.requeue();
-        if ((block.timestamp * amtToMove * 187) % 2 == 1) {
+        if ((block.timestamp * amtToMove * 187) % 3 == 1) {
             IRewardFlow(target).payForward();
         }
 
     }
 
-    function receiveVSR() public returns (uint amtToReceive) {
-        amtToReceive =  IGeras(gerasAddr).balanceOf(
-            address(this)) - availableReward;
-        availableReward += amtToReceive;
-    }
+    // function receiveVSR() public returns (uint amtToReceive) {
+    //     amtToReceive =  IGeras(gerasAddr).balanceOf(
+    //         address(this)) - availableReward;
+    //     availableReward += amtToReceive;
+    // }
 
 
     /** 
@@ -154,7 +153,7 @@ contract RewardFlow is IRewardFlow {
         * If the allocation amount is zero, remove completely.
     */
     function submitAllocation(address targetAddr, uint allocAmt) 
-    external returns (uint queuePosition) {
+    external override returns (uint queuePosition) {
 
         require(allocAmt <= MAX_ALLOC, 'Budget Allocation > 1024');
         require(IArtifact(artifactAddr).balanceOf(msg.sender) > 0, 
@@ -188,17 +187,25 @@ contract RewardFlow is IRewardFlow {
         * (or denied).
     */
     function redeemReward(address claimer, uint redeemAmt) external returns (
-        uint gerasAmt) {
+        uint availableGeras) {
+        // The artifact checks that the claimer is valid and the returns the 
+        // percentage that the redemption amounts to.
+        uint totalClaim = IArtifact(artifactAddr).accRewardClaim(artifactAddr);
+        uint availableClaim = IArtifact(artifactAddr).accRewardClaim(claimer);
+        require(totalClaim > 0, 'RF: Total claim is zero');
 
-        uint totalClaim = IArtifact(artifactAddr).redeemRewardClaim(
-            claimer, redeemAmt);
-        uint gerasAmt = IGeras(gerasAddr).balanceOf(
-            address(this)) * redeemAmt / totalClaim;
+        availableGeras = IGeras(gerasAddr).balanceOf(
+            address(this)) * availableClaim / totalClaim;
 
-        // This needs to convert into the actual asset and verify that the claimer is valid. 
-        IGeras(gerasAddr).transfer(address(this), claimer, gerasAmt);
+        require(redeemAmt <= availableGeras, 'RF Redemption exceeds available');
 
+        // Go back to artifact and take redemption from accumulated claims.
+        IArtifact(artifactAddr).redeemRewardClaim(
+            claimer, availableClaim * redeemAmt / availableGeras);
 
+        // This needs to convert into the actual asset and verify. 
+        // IGeras(gerasAddr).transfer(address(this), claimer, gerasAmt);
+        IGeras(gerasAddr).claimReward(redeemAmt, claimer);
     }
 
 }

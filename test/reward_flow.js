@@ -220,6 +220,8 @@ contract('RewardFlow', (accounts, deployer) => {
     await time.increase(duration);
     await GerasInstance.distributeGeras(RewardFlowAddr);
     const artifactOneStartingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowAddr));
+
+    // We should do a test with a payforward call, one without...
     await RewardFlowInstance.payForward();
     // await GerasInstance.distributeReward(RewardFlowInstanceNew.address);
 
@@ -241,7 +243,38 @@ contract('RewardFlow', (accounts, deployer) => {
     const startingGeras = Math.floor(rewardAmt); // 356736150748; //
     const finalGeras = 312143264840; //312144131905; // 
 
+    await mockERC.rebase();
+    const mockPredistribution = await mockERC.balanceOf.call(accounts[0]);
+    console.log('mockPredistribution', mockPredistribution.toString());
+
+    // console.log('totalMockERC', (await mockERC.balanceOf.call(geras)).toString());
+    // console.log('totalVirtualStakedAsset', (await GerasInstance.totalVirtualStakedAsset.call()).toString());
+    // console.log('root RF ', await (await Artifact.at(rootAddr)).rewardFlow.call());
+    // console.log('new RF ', await (await Artifact.at(newAddr)).rewardFlow.call());
+    // console.log('root RF ', RewardFlowInstance.address);
+    // console.log('root RF artifactAddr', await RewardFlowInstance.artifactAddr.call());
+    // console.log('root RF artifactAddr', rootAddr);
+
+    // Need to vouch again to update claimable reward!
+    await GerasInstance.distributeReward(1e10, 1024);
+    await HonorInstance.vouch(rootAddr, newAddr, 1000000);
+
+    // const returnedGeras = await RewardFlowInstance.redeemReward.call(accounts[0], 500000);
+
+    // const availableClaim = await (await Artifact.at(rootAddr)).redeemRewardClaim.call(accounts[0], 1);
+    // const availableClaim = await (await Artifact.at(rootAddr)).redeemRewardClaim.call(accounts[0], 1);
+
+    // console.log('availableClaim', (RewardFlowInstance.redeemReward.call(accounts[0], 1)).toString());
+
+    await RewardFlowInstance.redeemReward(accounts[0], 1e9);
+
+    const mockReturned = await mockERC.balanceOf.call(accounts[0]);
+    console.log('mockReturned', mockReturned.toString());
+    
+    // console.log('returnedGeras', returnedGeras.toString());
+
     // ENABLE THESE ASSERTS 
+    // assert.equal('10003599029650799019647', mockReturned.toString());
     assert.equal(artifactOneStartingBalanceGeras.toString(), startingGeras.toString(), 'starting root geras Incorrect');
     assert.equal(artifactOneEndingBalanceGeras.toString(), finalGeras.toString(), 'ending root geras Incorrect');
     assert.equal(artifactTwoEndingBalanceGeras.toString(), startingGeras - finalGeras, 'new artifact geras Incorrect');
@@ -334,6 +367,9 @@ contract('RewardFlow', (accounts, deployer) => {
 
     // console.log('builderEndingBalance R', builderEndingBalance.toString());
     assert.equal(builderEndingBalance.toString(), expectedBuilderChange, "Incorrect change for builder");
+
+
+
 
   });
 

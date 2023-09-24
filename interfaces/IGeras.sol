@@ -10,7 +10,8 @@ interface IGeras {
     function getHonorClaim(address account) external view returns (uint);
     function getLastUpdated(address account) external view returns (uint);
     function mintHonorClaim(address account) external returns (uint, uint);
-
+    function distributeReward(uint amountToDistribute, uint rate) external;
+    function claimReward(uint gerasClaim, address claimer) external returns (uint);
 
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Stake(address indexed from, address indexed to, uint256 value);

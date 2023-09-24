@@ -36,8 +36,6 @@ contract Honor is ISTT {
         artifactoryAddr = artifactoryAddress;
         rootArtifact = (IArtifactory(artifactoryAddr).createArtifact(
             tx.origin, address(this), "rootArtifact"));
-        // gerasAddr = address(new Geras(rootArtifact, address(this), 
-        //     stakedAssetAddress));
 
         _mint(rootArtifact, 10000e18);
         IArtifact(rootArtifact).initVouch(msg.sender, 10000e18);
@@ -82,11 +80,6 @@ contract Honor is ISTT {
         return IArtifact(addr).accHonorHours();
     }
 
-    // function updateStakingRewards(address addr) public returns (uint newRewards) { 
-    //     newRewards = uint(block.timestamp - _lastUpdated[addr]) * _stakedAsset[addr];
-    //     _accStakingRewards[addr] += newRewards; 
-    // }
-
     /* 
      * The presiding HONOR contract will manage housekeeping between the available artifacts. 
      * This includes checking whether the destination is validated, and overseeing the 
@@ -99,12 +92,12 @@ contract Honor is ISTT {
             "Inval vouch");
         require(IArtifact(_from).balanceOf(msg.sender) >= amount, 
             "HONOR: Insuff. vouch bal");
+        require(IArtifact(_from).honorAddr() == address(this), 
+            'artifact doesnt exist');
 
         uint hnrAmt = IArtifact(_from).unvouch(msg.sender, amount, false);
         _transfer(_from, _to, hnrAmt);
 
-        require(IArtifact(_from).honorAddr() == address(this), 
-            'artifact doesnt exist');
         revouchAmt = IArtifact(_to).vouch(msg.sender); 
 
         emit Vouch(msg.sender, _from, _to, hnrAmt);
@@ -123,14 +116,11 @@ contract Honor is ISTT {
             builder, address(this), loc));
 
         uint hnrAmt = IArtifact(_from).unvouch(msg.sender, VALIDATE_AMT, true);
-        // uint hnrAmt = vouch(_from, proposedAddr, VALIDATE_AMT);
-        // uint hnrAmt = 1;
 
-        _transfer(_from, proposedAddr, VALIDATE_AMT);// VALIDATE_AMT);
+        _transfer(_from, proposedAddr, VALIDATE_AMT);
         IArtifact(proposedAddr).initVouch(msg.sender, VALIDATE_AMT);
         // IArtifact(proposedAddr).receiveDonation();
         IArtifact(proposedAddr).validate();
-        // latestProposed = proposedAddr;
     }
 
     /* 

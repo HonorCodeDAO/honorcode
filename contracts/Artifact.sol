@@ -101,14 +101,18 @@ contract Artifact is IArtifact {
       * Geras contract knows how much is redeemable by this claimer.
     */
     function redeemRewardClaim(address claimer, uint256 redeemAmt) 
-    external override returns (uint256 totalClaim) {
-        require(msg.sender == rewardFlow, 'Only RF can redeem reward');
+    external override {
+        // require(msg.sender == rewardFlow, 'Only RF can redeem reward');
         require(_accRewardClaims[claimer] >= redeemAmt, 
-            'amount unavailable to redeem');
-        totalClaim = _accRewardClaims[address(this)]; 
+            'redeem amount exceeds accRewardClaims');
         _accRewardClaims[claimer] = _accRewardClaims[claimer] - redeemAmt;
-        _accRewardClaims[address(this)] = totalClaim - redeemAmt;
+        _accRewardClaims[address(this)] = _accRewardClaims[address(this)] - redeemAmt;
     }
+
+    function accRewardClaim(address claimer) external override returns (uint) {
+        return _accRewardClaims[claimer];
+    } 
+
 
     /** 
       * Given some input honor to this artifact, return the output vouch amount. 
@@ -245,7 +249,7 @@ contract Artifact is IArtifact {
         return _balances[addr];
     }
 
-    function setRewardFlow() external override returns(address rewardFlow) {
+    function setRewardFlow() external override returns(address) {
         require(rewardFlow == address(0), 'Artifact rewardFlow already set');
         require(ISTT(honorAddr).rewardFlowFactory() == IRewardFlow(
             msg.sender).rfFactory(), 'Invalid rewardFlowFactory');
@@ -254,6 +258,7 @@ contract Artifact is IArtifact {
         "RF/artifact pair don't match");
 
         rewardFlow = msg.sender;
+        return rewardFlow;
     }
 
     function receiveDonation() external override returns(uint) {

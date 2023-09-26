@@ -208,7 +208,7 @@ contract('RewardFlow', (accounts, deployer) => {
     // console.log(geras);
 
     const artifactTwoStartingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowAddr)).toNumber();
-    const alloc = (await RewardFlowInstance.submitAllocation(RewardFlowAddrNew, 512));
+    const alloc = (await RewardFlowInstance.submitAllocation(RewardFlowAddrNew, 128));
     // const newAlloc = (await RewardFlowInstance.submitAllocation(RewardFlowInstanceNew.address, 128));
 
     await mockERC.transfer(GerasInstance.address, '1000000000000000');
@@ -222,6 +222,7 @@ contract('RewardFlow', (accounts, deployer) => {
     const artifactOneStartingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowAddr));
 
     // We should do a test with a payforward call, one without...
+    await RewardFlowInstance.payForward();
     await RewardFlowInstance.payForward();
     // await GerasInstance.distributeReward(RewardFlowInstanceNew.address);
 
@@ -241,7 +242,7 @@ contract('RewardFlow', (accounts, deployer) => {
     });
 
     const startingGeras = Math.floor(rewardAmt); // 356736150748; //
-    const finalGeras = 312143264840; //312144131905; // 
+    const finalGeras = 311968394664; // 312143264840; //312144131905; // 
 
     await mockERC.rebase();
     const mockPredistribution = await mockERC.balanceOf.call(accounts[0]);
@@ -341,7 +342,7 @@ contract('RewardFlow', (accounts, deployer) => {
 
     const artifactTwoStartingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowInstanceNew.address)).toNumber();
 
-    const alloc = (await RewardFlowInstance.submitAllocation(RewardFlowInstanceNew.address, 256));
+    const alloc = (await RewardFlowInstance.submitAllocation(RewardFlowInstanceNew.address, 64));
     console.log('Gas to submitAllocation', alloc.receipt.gasUsed);
 
     // const newAlloc = (await RewardFlowInstance.submitAllocation(RewardFlowInstanceNew.address, 128));

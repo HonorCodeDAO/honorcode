@@ -51,7 +51,7 @@ library BQueue {
     }
 
     function isEmpty(BudgetQ storage bq) public view returns (bool empty) {
-        empty = bq.first > bq.last;
+        empty = bq.first == 0 || bq.first > bq.last;
     }
 
     function getNextPos(BudgetQ storage bq) public view returns (uint nextPos) {

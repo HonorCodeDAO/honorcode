@@ -82,6 +82,7 @@ contract RewardFlow is IRewardFlow {
     uint public availableReward;
     uint public totalGeras;
     uint32 public _lastUpdated;
+    bool public isRoot;
 
 
     constructor(address artifactAddr_, address gerasAddr_) {
@@ -91,6 +92,9 @@ contract RewardFlow is IRewardFlow {
         artifactAddr = artifactAddr_;
         gerasAddr = gerasAddr_;
         rfFactory = msg.sender;
+        if (artifactAddr == ISTT(IArtifact(artifactAddr).honorAddr()).rootArtifact()) {
+            isRoot = true;
+        }
         // Default is to keep all flow to this artifact.
         _lastUpdated = uint32(block.timestamp);
         BQueue.incrementFirst(bq);
@@ -128,6 +132,7 @@ contract RewardFlow is IRewardFlow {
         }
 
         if (rewarderAddr == address(this)) {
+            if (isRoot) { return (address(this), 0); }
             // nextV = artifact_.totalSupply() / 2;
             nextV = artifact_.accRewardClaim(artifactAddr) / 2;
         }

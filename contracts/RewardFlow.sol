@@ -82,7 +82,6 @@ contract RewardFlow is IRewardFlow {
     uint public availableReward;
     uint public totalGeras;
     uint32 public _lastUpdated;
-    uint public totalVouchAllocated;
 
 
     constructor(address artifactAddr_, address gerasAddr_) {
@@ -111,23 +110,26 @@ contract RewardFlow is IRewardFlow {
     // Formula is: (H_i/Sum_j(H) * accumulated / F)
     // where F is the constant FRACTION_TO_PASS, resulting in exponential decay:
     // (1 - 1/(F H_i/Sum_j(H))) ^ T. 
+    // Additionally, we'll have the default allocation keep half to itself,
+    // to prevent a repetitive drainage attack.
     function payForward() external override returns (
         address target, uint rewardAmt) {
         receiveVSR();
         if (BQueue.isEmpty(bq)) { return (address(this), 0);}
         address rewarderAddr = BQueue.peek(bq);
         IArtifact artifact_ = IArtifact(artifactAddr);
-        uint nextV = artifact_.balanceOf(rewarderAddr);
+        uint nextV = artifact_.updateAccumulated(rewarderAddr);
+        // uint nextV = artifact_.balanceOf(rewarderAddr);
 
         if (nextV == 0 || allocations[rewarderAddr].amount == 0 || (
             positions[rewarderAddr] == 0)) {
             BQueue.dequeue(bq);
-            totalVouchAllocated -= nextV;
             return (address(this), 0);
         }
 
         if (rewarderAddr == address(this)) {
-            nextV = artifact_.totalSupply() - totalVouchAllocated;
+            // nextV = artifact_.totalSupply() / 2;
+            nextV = artifact_.accRewardClaim(artifactAddr) / 2;
         }
 
         target = allocations[rewarderAddr].target; 
@@ -137,9 +139,12 @@ contract RewardFlow is IRewardFlow {
         // uint amtToMove = SafeMath.max(availableReward, availableReward * timeElapsed / RATE_TO_ACCRUE);
 
         uint amtToMove = availableReward * nextV / (
-            artifact_.totalSupply() * FRACTION_TO_PASS);
+            artifact_.accRewardClaim(artifactAddr) * 2 * FRACTION_TO_PASS);
+            // artifact_.totalSupply() * 2 * FRACTION_TO_PASS);
         rewardAmt = amtToMove * alloc / MAX_ALLOC;
-        IGeras(gerasAddr).transfer(address(this), target, rewardAmt);
+        if (target != address(this)) {
+            IGeras(gerasAddr).transfer(address(this), target, rewardAmt);
+        }
         availableReward -= amtToMove;
         // accumulatedPayout += amtToMove * (MAX_ALLOC - alloc) / MAX_ALLOC;
 
@@ -188,7 +193,6 @@ contract RewardFlow is IRewardFlow {
             queuePosition = BQueue.getNextPos(bq);
             BQueue.enqueue(bq, msg.sender);
             positions[msg.sender] = queuePosition;
-            totalVouchAllocated += IArtifact(artifactAddr).balanceOf(msg.sender);
         }
 
         allocations[msg.sender] = Allocation(targetAddr, allocAmt);

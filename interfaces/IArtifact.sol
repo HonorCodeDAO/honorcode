@@ -4,6 +4,7 @@ interface IArtifact {
 
     function balanceOf(address account) external view returns (uint256);
     function initVouch(address account, uint inputHonor) external returns(uint);
+    function updateAccumulated(address voucher) external returns (uint); 
     function vouch(address account) external returns (uint256);
     function unvouch(address account, uint256 unvouchAmt, bool isHonor) external returns(uint256);
     function antivouch(address account) external returns(uint);

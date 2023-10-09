@@ -33,7 +33,7 @@ contract Artifact is IArtifact {
     uint public honorWithin;
     int public netHonor;
     uint public accHonorHours;
-    uint public builderHonor;
+    // uint public builderHonor;
     bool public isValidated;
     address public rewardFlow;
 
@@ -73,6 +73,8 @@ contract Artifact is IArtifact {
         vouchAmt = SafeMath.floorSqrt(inputHonor) << 30;
         _mint(account, vouchAmt);
         honorWithin = inputHonor;
+        _lastUpdatedVouch[account] = uint32(block.timestamp);
+
         // netHonor += inputHonor;
     }
 
@@ -81,18 +83,25 @@ contract Artifact is IArtifact {
       * These will be updated asynchronously, although the total will always 
       * have the correct value since we know the total supply.
     */
-    function updateAccumulated(address voucher) private returns (uint256) {
+    function updateAccumulated(address voucher) public override returns (uint) {
+
+        // We don't want an infinite loop, but we do want to include the builder
+        // in the new total. 
+        // if (voucher != builder) { recomputeBuilderVouch(); }
 
         _accRewardClaims[address(this)] += _totalSupply * (
             uint32(block.timestamp) - _lastUpdatedVouch[address(this)]);
         _lastUpdatedVouch[address(this)] = uint32(block.timestamp);
         if (voucher == address(this)) { return _accRewardClaims[address(this)];}
-        if (balanceOf(voucher) == 0) { return 0; }
-        _accRewardClaims[voucher] += balanceOf(voucher) * (
-            uint32(block.timestamp) - _lastUpdatedVouch[voucher]);
+        if (_lastUpdatedVouch[voucher] != 0) {
+            if (_balances[voucher] == 0) { return _accRewardClaims[voucher]; }
+            _accRewardClaims[voucher] = _accRewardClaims[voucher] + _balances[voucher] * (
+                uint32(block.timestamp) - _lastUpdatedVouch[voucher]);
+        }
         _lastUpdatedVouch[voucher] = uint32(block.timestamp);
         return _accRewardClaims[voucher];
     }
+
 
     /**
       * Given some amount to redeem by the artifact's RF contract, check how  
@@ -113,7 +122,6 @@ contract Artifact is IArtifact {
         return _accRewardClaims[claimer];
     } 
 
-
     /** 
       * Given some input honor to this artifact, return the output vouch amount. 
       * The change in vouch claim will be calculated from the difference in 
@@ -133,7 +141,7 @@ contract Artifact is IArtifact {
         uint deposit = SafeMath.sub(totalHonor, honorWithin);
 
         updateAccumulated(account);
-        updateAccumulated(address(this));
+        // updateAccumulated(address(this));
 
         if (SafeMath.floorSqrt(honorWithin) > 2**10) {
             vouchAmt = ((((SafeMath.floorSqrt(totalHonor)) * _totalSupply) / ( 
@@ -151,12 +159,18 @@ contract Artifact is IArtifact {
 
     /** 
        Given some valid input vouching claim to this artifact, return the honor. 
+       Delta(H) is calculated as:
+       H_out = H_T - (H_T * (V_T - V_in)^2) / V_T^2
+
+       OR 
+
+       V_in = V_T - (V_T * sqrt(H_T - H_out) / sqrt(H_T)
     */
     function unvouch(address account, uint unvouchAmt, bool isHonor) 
     external override returns(uint hnrAmt) {
         require(account == msg.sender || msg.sender == honorAddr, 
             'Only Honor or sender can unvouch');
-        updateAccumulated(address(this));
+        // updateAccumulated(address(this));
         updateAccumulated(account);
 
         if (!isHonor) {
@@ -169,7 +183,7 @@ contract Artifact is IArtifact {
         }
         else {
             require(honorWithin >= unvouchAmt && _balances[account] > 0, 
-                'Insuff. honpr vouch bal');
+                'Insuff. honor vouch bal');
             hnrAmt = unvouchAmt;
             unvouchAmt = _totalSupply - ((((
                 SafeMath.floorSqrt(honorWithin - hnrAmt)) * _totalSupply) / ( 
@@ -219,7 +233,6 @@ contract Artifact is IArtifact {
         return 0;
     }
 
-
     /* 
      * The amount of the vouch claim going to the builder will increase based on 
      * the vouched HONOR over time. 
@@ -240,6 +253,7 @@ contract Artifact is IArtifact {
         }
         emit Vouch(builder, address(this), 0, newBuilderVouchAmt);
         _mint(builder, newBuilderVouchAmt);
+        updateAccumulated(builder);
     }
 
     function balanceOf(address addr) public view returns(uint) {

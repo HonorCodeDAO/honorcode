@@ -37,7 +37,7 @@ contract('RewardFlow', (accounts, deployer) => {
     const ArtiFactoryInstance = await Artifactory.deployed();
     const mockERC = await MockCoin.deployed();
     const HonorInstance = await Honor.new(ArtiFactoryInstance.address, mockERC.address, 'TEST_HONOR');
-    const GerasInstance = await Geras.new(await HonorInstance.rootArtifact.call(), HonorInstance.address, mockERC.address);
+    const GerasInstance = await Geras.new(HonorInstance.address);
     await HonorInstance.setGeras(GerasInstance.address);
     const geras = (await HonorInstance.gerasAddr.call());
     const RewardFlowFactoryInstance = await RewardFlowFactory.new(HonorInstance.address);
@@ -90,7 +90,7 @@ contract('RewardFlow', (accounts, deployer) => {
     const HonorInstance = await Honor.new(ArtiFactoryInstance.address, mockERC.address, 'TEST_HONOR');
     const rootAddr = await HonorInstance.rootArtifact.call();
     // const HonorInstance = await Honor.deployed();
-    const GerasInstance = await Geras.new(rootAddr, HonorInstance.address, mockERC.address);
+    const GerasInstance = await Geras.new(HonorInstance.address);
     await HonorInstance.setGeras(GerasInstance.address);
     
     const gerasAddr = await HonorInstance.gerasAddr.call();
@@ -220,9 +220,18 @@ contract('RewardFlow', (accounts, deployer) => {
     await time.increase(duration);
     await GerasInstance.distributeGeras(RewardFlowAddr);
     const artifactOneStartingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowAddr));
+    console.log('starting geras', artifactOneStartingBalanceGeras.toString()); // 356735159817
+
+    // const artifactOneAcc = (await (await Artifact.at(rootAddr)).accRewardClaim.call(accounts[0]));
+    // console.log('artifactOneAcc', artifactOneAcc.toString()); // 356735159817
 
     // We should do a test with a payforward call, one without...
     await RewardFlowInstance.payForward();
+    const rootartifactAcc = (await (await Artifact.at(rootAddr)).accRewardClaim.call(rootAddr));
+    console.log('rootartifactAcc', rootartifactAcc.toString()); // 356735159817
+    const artifactOneAcc = (await (await Artifact.at(rootAddr)).accRewardClaim.call(accounts[0]));
+    console.log('artifactOneAcc', artifactOneAcc.toString()); // 356735159817
+
     await RewardFlowInstance.payForward();
     // await GerasInstance.distributeReward(RewardFlowInstanceNew.address);
 
@@ -230,7 +239,6 @@ contract('RewardFlow', (accounts, deployer) => {
 
     const artifactOneEndingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowAddr));
     const artifactTwoEndingBalanceGeras = (await GerasInstance.balanceOf.call(RewardFlowAddrNew));
-    console.log('starting geras', artifactOneStartingBalanceGeras.toString()); // 356735159817
     console.log(artifactOneEndingBalanceGeras.toString());
     console.log(artifactTwoEndingBalanceGeras.toString());
     console.log(rewardAmt);
@@ -298,7 +306,7 @@ contract('RewardFlow', (accounts, deployer) => {
     const rootAddr = await HonorInstance.rootArtifact.call();
     const rootBalance = await HonorInstance.balanceOf.call(rootAddr);
     const newAddr = await HonorInstance.proposeArtifact.call(rootAddr, builderTwo, 'new artifact');
-    const GerasInstance = await Geras.new(await HonorInstance.rootArtifact.call(), HonorInstance.address, mockERC.address);
+    const GerasInstance = await Geras.new(HonorInstance.address);
     await HonorInstance.setGeras(GerasInstance.address);
     const geras = (await HonorInstance.gerasAddr.call());
     
@@ -385,7 +393,7 @@ contract('RewardFlow', (accounts, deployer) => {
     const rootAddr = await HonorInstance.rootArtifact.call();
     const rootBalance = await HonorInstance.balanceOf.call(rootAddr);
     const newAddr = await HonorInstance.proposeArtifact.call(rootAddr, builderTwo, 'new artifact');
-    const GerasInstance = await Geras.new(await HonorInstance.rootArtifact.call(), HonorInstance.address, mockERC.address);
+    const GerasInstance = await Geras.new(HonorInstance.address);
     await HonorInstance.setGeras(GerasInstance.address);
     const geras = (await HonorInstance.gerasAddr.call());
 

@@ -46,6 +46,11 @@ contract Honor is ISTT {
         name = honorName;
     }
 
+    function setOwner(address newOwner) external override {
+        require(owner == msg.sender, 'Only owner can change owner');
+        owner = newOwner;
+    }
+
     function setRewardFlowFactory() external override {
         require(rewardFlowFactory == address(0), 'RF factory already set');
         rewardFlowFactory = msg.sender;

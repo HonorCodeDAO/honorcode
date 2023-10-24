@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 interface ISTT {
 
     function balanceOf(address addr) external view returns(uint);
+    function totalSupply() external view returns (uint256);
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Vouch(address _account, address indexed _from, address indexed _to, uint256 _value);
     function setOwner(address newOwner) external;
@@ -13,6 +14,7 @@ interface ISTT {
     function rootArtifact() external view returns(address);
     function owner() external view returns(address);
     function rewardFlowFactory() external view returns(address);
+    function stakingMintPool() external view returns (uint);
     // function internalHonorBalanceOfArtifact(address addr) external view returns(uint);
 
 

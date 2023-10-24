@@ -132,7 +132,10 @@ contract RewardFlow is IRewardFlow {
         }
 
         if (rewarderAddr == address(this)) {
-            if (isRoot) { return (address(this), 0); }
+            if (isRoot) { 
+                BQueue.requeue(bq);
+                return (address(this), 0); 
+            }
             // nextV = artifact_.totalSupply() / 2;
             nextV = artifact_.accRewardClaim(artifactAddr) / 2;
         }

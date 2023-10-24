@@ -8,9 +8,11 @@ import "../interfaces/ISTT.sol";
 import "./SafeMath.sol";
 
 
-// Geras represents the "spoils" of HONOR. It is used to hold the staked asset,
-// tracking the farmed HONOR claims for stakers, and disperse cash flow rewards
-// to vouch holders across the various artifacts, including root. 
+/**
+ * Geras represents the "spoils" of HONOR: in this case, a virtual staked asset. 
+ * It is used to hold a staked asset, track the farmed HONOR claims for stakers, 
+ * and disperse cash flow rewards to vouchers across the various artifacts.
+ */ 
 contract Geras is IGeras {
     mapping (address => uint) private _balances;
     mapping (address => uint) private _stakedAsset;
@@ -19,7 +21,7 @@ contract Geras is IGeras {
     address public rootArtifact;
     address public stakedAssetAddr;
     uint public totalVirtualStakedAsset;
-    uint public totalVirtualStakedReward;
+    uint public stakedShares;
     uint public redeemableReward;
     uint public claimableReward;
 
@@ -54,20 +56,30 @@ contract Geras is IGeras {
         return _balances[addr]; 
     } 
 
+    /**
+     *  The wrapped asset will be passed into this contract in terms of shares.
+     *  However, all accounting will be done in terms of the underlying staked 
+     *  asset, stETH in this case. When a stake is removed, they will receive
+     *  fewer shares, but the same amount of stETH, as intended.
+     *  We need to keep track of both, because otherwise we won't know how much
+     *  is transferred as opposed to accrued through rebasing.
+     */
     function stakeAsset(address stakeTarget) public override returns (uint) {
         require(stakeTarget == rootArtifact, 'Only stake with root artifact');
-        uint totalStaked = IERC20(stakedAssetAddr).balanceOf(address(this));
-        require(totalVirtualStakedAsset < totalStaked, 
-            'No asset transferred to stake');
-
-        uint amt = totalStaked - totalVirtualStakedAsset;
-        if (_stakedAsset[stakeTarget] == 0) {_stakedAsset[stakeTarget] = amt;}
-        else {_stakedAsset[stakeTarget] += amt;}
+        uint totalShares = IERC20(stakedAssetAddr).balanceOf(address(this));
+        // uint totalStake = IERC20(stakedAssetAddr).getStETHByWstETH(totalShares);
+        require(totalShares > stakedShares, 'No asset transferred to stake'); // totalVirtualStakedAsset < totalStake, 
+        
+        uint amt = IERC20(stakedAssetAddr).getStETHByWstETH( 
+            totalShares - stakedShares);
+        // if (_stakedAsset[stakeTarget] == 0) {_stakedAsset[stakeTarget] = amt;}
+        // else {
+        _stakedAsset[stakeTarget] += amt;
         
         updateHonorClaims(msg.sender);
         _stakedAssetBalances[msg.sender] += amt;
-        totalVirtualStakedAsset += amt;
-
+        totalVirtualStakedAsset = totalVirtualStakedAsset + amt;
+        stakedShares = totalShares;
         emit Stake(msg.sender, stakeTarget, amt);
         return _stakedAsset[stakeTarget];
     }
@@ -83,6 +95,10 @@ contract Geras is IGeras {
 
     function getLastUpdated(address acct) external override view returns (uint){
         return _lastUpdatedStake[acct];
+    }
+
+    function lastUpdated() external override view returns (uint){
+        return _lastUpdated;
     }
 
     function mintHonorClaim(address account) external override returns (
@@ -116,9 +132,9 @@ contract Geras is IGeras {
         uint32 timeElapsed = uint32(block.timestamp) - _lastUpdated;
 
         // Assume new Geras accumulates at a rate of ~3% per year per unit VSA.
-        uint newGeras = _stakedAsset[rootArtifact] * 32 / 1024;
+        uint newGerasPerYear = _stakedAsset[rootArtifact] * 32 / 1024;
         _lastUpdated = uint32(block.timestamp);
-        _mint(rewardFlowAddr, timeElapsed * newGeras / 31536000); 
+        _mint(rewardFlowAddr, timeElapsed * newGerasPerYear / 31536000); 
         // IRewardFlow(rewardFlowAddr).payForward();
     }
 

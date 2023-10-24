@@ -35,13 +35,14 @@ contract Honor is ISTT {
         string memory honorName) {
         artifactoryAddr = artifactoryAddress;
         rootArtifact = (IArtifactory(artifactoryAddr).createArtifact(
-            tx.origin, address(this), "rootArtifact"));
+            msg.sender, address(this), "rootArtifact"));
 
         _mint(rootArtifact, 10000e18);
         IArtifact(rootArtifact).initVouch(msg.sender, 10000e18);
 
         IArtifact(rootArtifact).validate();
         stakedAssetAddr = stakedAssetAddress;
+        _lastUpdated = block.timestamp;
         owner = msg.sender;
         name = honorName;
     }
@@ -171,13 +172,16 @@ contract Honor is ISTT {
         uint totalFarmedHonor;
         (farmedHonor, totalFarmedHonor) = IGeras(gerasAddr).mintHonorClaim(
             msg.sender);
-        require(totalFarmedHonor > 0 && farmedHonor > 0, 
+        require(totalFarmedHonor >= farmedHonor && farmedHonor > 0, 
             'No farmed Honor available');
         uint hnrToMint = farmedHonor * _stakingMintPool / totalFarmedHonor;
-        hnrToMint = SafeMath.min(hnrToMint, _stakingMintPool);
         _stakingMintPool -= hnrToMint;
         _mint(rootArtifact, hnrToMint);
         IArtifact(rootArtifact).vouch(msg.sender);
+    }
+
+    function stakingMintPool() external override view returns (uint) {
+        return _stakingMintPool;
     }
 
     function _transfer(address sender, address recipient, uint256 amount) 
@@ -192,6 +196,10 @@ contract Honor is ISTT {
         _balances[recipient] += amount;
 
         emit Transfer(sender, recipient, amount);
+    }
+
+    function totalSupply() external override view returns (uint256) {
+        return _totalSupply;
     }
 }
 

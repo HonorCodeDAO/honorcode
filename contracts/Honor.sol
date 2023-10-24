@@ -117,7 +117,6 @@ contract Honor is ISTT {
         // We'll check if sender has a positive balance but will still fail below if insufficient
         require(IArtifact(_from).balanceOf(msg.sender) > 0, 
             "Insuff. proposer/source bal");
-        // require(balanceOf(msg.sender) >= VALIDATE_AMT, "Insuff. proposer bal");
         proposedAddr = (IArtifactory(artifactoryAddr).createArtifact(
             builder, address(this), loc));
 

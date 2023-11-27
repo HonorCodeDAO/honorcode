@@ -24,3 +24,6 @@ etc.) without the inflexibility of Soul-bounded tokens. For the retroactive publ
 this structure can act as a *Results Oracle*, estimating impact over time. The prediction market aspect
 creates incentives to reward early supporters of a promising contribution and allocate recognition 
 and financial rewards to builders. 
+
+TEMPORARY DOCS SITE: https://docs-site-lac.vercel.app/
+

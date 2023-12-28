@@ -7,6 +7,8 @@ interface IRewardFlow {
     function rfFactory() external view returns(address);
     function payForward() external returns(address, uint);
     function availableReward() external returns(uint);
+    function receiveVSR() external returns(uint);
+    function nextAllocator() external view returns (address);
     function setArtifact() external;
     function submitAllocation(address targetAddr, uint8 allocAmt) external returns(uint);
     function redeemReward(address claimer, uint redeemAmt) external returns (uint);

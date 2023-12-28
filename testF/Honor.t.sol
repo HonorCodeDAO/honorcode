@@ -40,9 +40,10 @@ contract HonorTest is Test {
         vm.assume(amount > 0.00001 ether);
         address builder = root.builder();
         vm.prank(builder);
-        address newA = hnr.proposeArtifact(address(root), address(808), 'newA');
+        address newA = hnr.proposeArtifact(address(root), address(808), 'newA', false);
 
-        assertEq(hnr.balanceOf(address(root)), 9999 ether, 'proposal Honor incorrect');
+        hnr.validateArtifact(address(root), newA);
+        assertEq(hnr.balanceOf(address(root)), 9998 ether, 'proposal Honor incorrect');
 
         uint rootVouch = root.balanceOf(builder);
         assertEq(rootVouch, root.totalSupply());
@@ -50,9 +51,9 @@ contract HonorTest is Test {
         uint expectedHnrOut = rootBal - (rootBal * (rootVouch - amount) ** 2) / (root.totalSupply() ** 2);
         uint vouchAmt = hnr.vouch(address(root), newA, amount);
 
-        assertEq(hnr.balanceOf(address(newA)), expectedHnrOut + 1 ether, 
+        assertEq(hnr.balanceOf(address(newA)), expectedHnrOut + 2 ether, 
             'expected HONOR in new address incorrect');
-        assertEq(hnr.balanceOf(address(root)), 9999 ether - expectedHnrOut, 
+        assertEq(hnr.balanceOf(address(root)), 9998 ether - expectedHnrOut, 
             'expected HONOR in root incorrect');
 
     }
@@ -62,12 +63,11 @@ contract HonorTest is Test {
         vm.assume(duration > 1000);
         vm.assume(duration < 1000000);
 
-
         vm.assume(amount < 100 ether);
         vm.assume(amount > 0.00001 ether);
         address builder = root.builder();
         vm.prank(builder);
-        address newA = hnr.proposeArtifact(address(root), address(808), 'newA');
+        address newA = hnr.proposeArtifact(address(root), address(808), 'newA', true);
 
 
         vm.warp(block.timestamp + duration);
@@ -84,11 +84,5 @@ contract HonorTest is Test {
 
     }
 
-
-
-    // function testFuzz_SetNumber(uint256 x) public {
-    //     counter.setNumber(x);
-    //     assertEq(counter.number(), x);
-    // }
 }
 

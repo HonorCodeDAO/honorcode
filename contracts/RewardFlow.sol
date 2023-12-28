@@ -75,13 +75,13 @@ contract RewardFlow is IRewardFlow {
     uint8 constant public MAX_ALLOC = 255;
 
     BudgetQ private bq;
+    uint32 private _lastUpdated;
     address public artifactAddr;
     address public gerasAddr;
     address public rfFactory; 
     uint public accumulatedPayout;
     uint public availableReward;
     uint public totalGeras;
-    uint32 public _lastUpdated;
     bool public isRoot;
 
 
@@ -110,6 +110,16 @@ contract RewardFlow is IRewardFlow {
         IArtifact(artifactAddr).setRewardFlow();
     }
 
+    // Add some to the amount available to be paid out to others. The remainder
+    // will stay in this rewardflow. 
+    function receiveVSR() public override returns (uint amtToReceive) {
+        require(IGeras(gerasAddr).balanceOf(address(this)) >= totalGeras,
+            'Total Geras less than balance');
+        amtToReceive =  IGeras(gerasAddr).balanceOf(address(this)) - totalGeras;
+        totalGeras += amtToReceive;
+        availableReward += amtToReceive;
+    }
+
     // Dequeue the next item, calculate the amount to send, and transfer.
     // Formula is: (H_i/Sum_j(H) * accumulated / F)
     // where F is the constant FRACTION_TO_PASS, resulting in exponential decay:
@@ -119,12 +129,16 @@ contract RewardFlow is IRewardFlow {
     function payForward() external override returns (
         address target, uint rewardAmt) {
         receiveVSR();
-        if (BQueue.isEmpty(bq)) { return (address(this), 0);}
+        // Let's prevent unnecessary loops / propogation 
+        if (BQueue.isEmpty(bq) || (availableReward == 0) || _lastUpdated > block.timestamp) { 
+            return (address(this), 0);
+        }
         address rewarderAddr = BQueue.peek(bq);
         IArtifact artifact_ = IArtifact(artifactAddr);
         uint nextV = artifact_.updateAccumulated(rewarderAddr);
         // uint nextV = artifact_.balanceOf(rewarderAddr);
 
+        _lastUpdated = uint32(block.timestamp);
         if (nextV == 0 || allocations[rewarderAddr].amount == 0 || (
             positions[rewarderAddr] == 0)) {
             BQueue.dequeue(bq);
@@ -150,13 +164,20 @@ contract RewardFlow is IRewardFlow {
             artifact_.accRewardClaim(artifactAddr) * 2 * FRACTION_TO_PASS);
             // artifact_.totalSupply() * 2 * FRACTION_TO_PASS);
         rewardAmt = amtToMove * alloc / MAX_ALLOC;
+        BQueue.requeue(bq);
+
+        if (rewardAmt <= 0) {
+            return (target, 0);
+        }
+
         if (target != address(this)) {
             IGeras(gerasAddr).transfer(address(this), target, rewardAmt);
+            totalGeras -= rewardAmt;
         }
         availableReward -= amtToMove;
+
         // accumulatedPayout += amtToMove * (MAX_ALLOC - alloc) / MAX_ALLOC;
 
-        BQueue.requeue(bq);
         if (rewarderAddr != address(this) && (
             block.timestamp * amtToMove * 187) % 3 == 1) {
             IRewardFlow(target).payForward();
@@ -164,12 +185,8 @@ contract RewardFlow is IRewardFlow {
 
     }
 
-    // Add some to the amount available to be paid out to others. The remainder
-    // will stay in this rewardflow. 
-    function receiveVSR() public returns (uint amtToReceive) {
-        amtToReceive =  IGeras(gerasAddr).balanceOf(address(this)) - totalGeras;
-        totalGeras += amtToReceive;
-        availableReward += amtToReceive;
+    function nextAllocator() external override view returns (address) {
+        return BQueue.peek(bq);
     }
 
     /** 

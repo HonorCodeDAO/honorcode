@@ -89,6 +89,10 @@ contract Artifact is IArtifact {
         // in the new total. 
         // if (voucher != builder) { recomputeBuilderVouch(); }
 
+        if (uint32(block.timestamp) == _lastUpdatedVouch[voucher]) {
+            return _accRewardClaims[voucher];
+        }
+
         _accRewardClaims[address(this)] += _totalSupply * (
             uint32(block.timestamp) - _lastUpdatedVouch[address(this)]);
         _lastUpdatedVouch[address(this)] = uint32(block.timestamp);
@@ -152,7 +156,7 @@ contract Artifact is IArtifact {
         }
         emit Vouch(account, address(this), deposit, vouchAmt);
         _mint(account, vouchAmt);
-        recomputeBuilderVouch();
+        if (isValidated) { recomputeBuilderVouch(); }
         honorWithin += deposit;
         // netHonor += deposit;
     }
@@ -193,7 +197,8 @@ contract Artifact is IArtifact {
 
         emit Unvouch(account, address(this), hnrAmt, unvouchAmt);
 
-        recomputeBuilderVouch();
+        if (isValidated) { recomputeBuilderVouch(); }
+        
         honorWithin -= hnrAmt;
         _burn(account, unvouchAmt);
         // netHonor -= hnrAmt;

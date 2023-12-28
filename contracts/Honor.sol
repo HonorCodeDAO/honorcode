@@ -91,8 +91,8 @@ contract Honor is ISTT {
      * This includes checking whether the destination is validated, and overseeing the 
      * transfer of base HONOR. 
      */ 
-    function vouch(address _from, address _to, uint amount) public returns(
-        uint revouchAmt) {
+    function vouch(address _from, address _to, uint amount) external override 
+    returns(uint revouchAmt) {
         require(_balances[_to] != 0 && _balances[_from] != 0 && (
             IArtifact(_to).isValidated()), 
             "Inval vouch");
@@ -112,36 +112,43 @@ contract Honor is ISTT {
     /* 
      * Propose adding a new artifact that refers to certain link or document. 
      */ 
-    function proposeArtifact(address _from, address builder, string memory loc) 
-    public returns(address proposedAddr) { 
+    function proposeArtifact(address _from, address builder, string memory loc, 
+        bool should_validate) 
+    external override returns(address proposedAddr) { 
         // We'll check if sender has a positive balance but will still fail below if insufficient
         require(IArtifact(_from).balanceOf(msg.sender) > 0, 
             "Insuff. proposer/source bal");
         proposedAddr = (IArtifactory(artifactoryAddr).createArtifact(
             builder, address(this), loc));
 
-        uint hnrAmt = IArtifact(_from).unvouch(msg.sender, VALIDATE_AMT, true);
+        IArtifact(_from).unvouch(msg.sender, VALIDATE_AMT, true);
 
         _transfer(_from, proposedAddr, VALIDATE_AMT);
         IArtifact(proposedAddr).initVouch(msg.sender, VALIDATE_AMT);
-        // IArtifact(proposedAddr).receiveDonation();
-        IArtifact(proposedAddr).validate();
+        emit Vouch(msg.sender, _from, proposedAddr, VALIDATE_AMT);
+
+        // Most of the time, we would expect a two-stage propose/validate process,
+        // but allow this for convenience.
+        if (should_validate) {IArtifact(proposedAddr).validate();}
     }
 
     /* 
      * After an artifact is proposed, it will need to be validated to be fully 
      * vouchable. This process should involve some version of token curation but 
-     * for now requires additional HONOR lockup. 
+     * for now requires additional HONOR commitment. 
      */
     function validateArtifact(address _from, address addr) 
-    public returns(bool validated) { 
+    external override returns(bool validated) { 
         if (IArtifact(addr).isValidated() && _balances[addr] > 0) {return true;}
         require(IArtifact(_from).balanceOf(msg.sender) >= VALIDATE_AMT, 
             "Insuff. val bal");
+        require(IArtifact(addr).builder() != msg.sender, 
+            'Builder cannot validate');
 
         uint hnrAmt = IArtifact(_from).unvouch(msg.sender, VALIDATE_AMT, true);
         _transfer(_from, addr, hnrAmt);
-        IArtifact(addr).receiveDonation();
+        IArtifact(addr).vouch(msg.sender); 
+        emit Vouch(msg.sender, _from, addr, VALIDATE_AMT);
         return IArtifact(addr).validate();
     }
 

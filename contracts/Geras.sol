@@ -64,16 +64,13 @@ contract Geras is IGeras {
      *  We need to keep track of both, because otherwise we won't know how much
      *  is transferred as opposed to accrued through rebasing.
      */
-    function stakeAsset(address stakeTarget) public override returns (uint) {
+    function stakeAsset(address stakeTarget) external override returns (uint) {
         require(stakeTarget == rootArtifact, 'Only stake with root artifact');
         uint totalShares = IERC20(stakedAssetAddr).balanceOf(address(this));
-        // uint totalStake = IERC20(stakedAssetAddr).getStETHByWstETH(totalShares);
-        require(totalShares > stakedShares, 'No asset transferred to stake'); // totalVirtualStakedAsset < totalStake, 
-        
-        uint amt = IERC20(stakedAssetAddr).getStETHByWstETH( 
+
+        require(totalShares > stakedShares, 'No asset transferred to stake'); 
+        uint amt = IERC20(stakedAssetAddr).getStETHByWstETH(
             totalShares - stakedShares);
-        // if (_stakedAsset[stakeTarget] == 0) {_stakedAsset[stakeTarget] = amt;}
-        // else {
         _stakedAsset[stakeTarget] += amt;
         
         updateHonorClaims(msg.sender);

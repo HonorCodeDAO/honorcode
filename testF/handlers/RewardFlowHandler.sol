@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 import {Test} from "forge-std/Test.sol";
 import {IRewardFlow} from "../../interfaces/IRewardFlow.sol";
 import {IArtifact} from "../../interfaces/IArtifact.sol";
+import {IGeras} from "../../interfaces/IGeras.sol";
 import {RewardFlow} from "../../contracts/RewardFlow.sol";
 import {Geras} from "../../contracts/Geras.sol";
 
@@ -20,8 +21,14 @@ contract RewardFlowHandler is Test {
 
     function payForward(uint flowIdx, uint duration) external {
         duration = uint32(bound(duration, 1000, 1000000));
+        vm.startPrank(owner);        
+        if (IRewardFlow(rfs[flowIdx % rfs.length]).availableReward() == 0) {
+            IRewardFlow(rfs[0]).submitAllocation(
+                rfs[flowIdx % rfs.length], uint8(128));
+        }
         vm.warp(block.timestamp + duration);
         IRewardFlow(rfs[flowIdx % rfs.length]).payForward();
+        vm.stopPrank();
     }
 
     function submitAllocation(uint allocatorIdx, uint granteeIdx, uint amt) external {
@@ -36,10 +43,28 @@ contract RewardFlowHandler is Test {
 
     function redeemReward(uint redeemerIdx, uint amt, uint duration) external {
         duration = uint32(bound(duration, 1000, 1000000));
+        vm.startPrank(owner);
+        amt = uint32(bound(amt, 1000, IArtifact(IRewardFlow(
+            rfs[redeemerIdx % rfs.length]).artifactAddr()).accRewardClaim(owner)));
+        vm.warp(block.timestamp + duration);
+        IRewardFlow(rfs[redeemerIdx % rfs.length]).redeemReward(owner, amt);
+        vm.stopPrank();
+    }
+
+    function distributeGeras(uint duration) external {
+        duration = uint32(bound(duration, 1000, 1000000));
         vm.warp(block.timestamp + duration);
         vm.startPrank(owner);
-        IRewardFlow(rfs[redeemerIdx % rfs.length]).redeemReward(msg.sender, amt);
+        IGeras(gerasAddr).distributeGeras(rfs[0]);
         vm.stopPrank();
+    }
+
+    function distributeReward(uint amt, uint rate, uint duration) external {
+        amt = uint32(bound(amt, 1000, 0.01 ether));
+        duration = uint32(bound(duration, 1000, 1000000));
+        rate = uint32(bound(rate, 1, 1024));
+        vm.warp(block.timestamp + duration);
+        IGeras(gerasAddr).distributeReward(amt, rate);
     }
 
 }

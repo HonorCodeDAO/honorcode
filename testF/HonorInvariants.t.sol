@@ -30,12 +30,8 @@ contract InvariantHonorTest is Test {
     address public staker;
 
     function setUp() public {
-        // HonorFactory hfact = new HonorFactory();
         afact = new Artifactory();
         staker = address(555);
-        // hnr = Honor(hfact.createHonor(address(afact), address(mockERC), 
-        //     'TEST_HONOR'));
-
         vm.startPrank(staker);
         mockERC = new MockCoin();
         vm.stopPrank();
@@ -62,10 +58,14 @@ contract InvariantHonorTest is Test {
         address[3] memory artifacts = [address(root), newA, newB];
         address[3] memory flows = [address(rootRF), rootRFA, rootRFB];
 
+        vm.warp(block.timestamp + 10000);
+        geras.distributeGeras(address(rootRF));
+
         hnrH = new HonorHandler(hnr, artifacts);
         targetContract(address(hnrH));
         rfH = new RewardFlowHandler(flows, address(geras), hnr.owner());
         targetContract(address(rfH));
+
     }
 
     function invariant_GerasBalance() public {
@@ -73,10 +73,12 @@ contract InvariantHonorTest is Test {
         uint rfBalance;
         for (uint i; i < 3; i++) {
             gBalance += geras.balanceOf(rfH.rfs(i));
+            IRewardFlow(rfH.rfs(i)).receiveVSR();
             rfBalance += IRewardFlow(rfH.rfs(i)).totalGeras();
+            assertEq(geras.balanceOf(rfH.rfs(i)), IRewardFlow(rfH.rfs(i)).totalGeras(), new string(i));
         }
         assertEq(gBalance, geras.totalSupply(), 'RF geras imbalance');
-        assertEq(gBalance, geras.totalSupply(), 'RF totalgeras imbalance');
+        assertEq(rfBalance, geras.totalSupply(), 'RF totalgeras imbalance');
     }
 
     function invariant_HonorBalance() public {

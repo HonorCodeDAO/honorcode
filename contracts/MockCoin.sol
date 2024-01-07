@@ -2,13 +2,13 @@
 // Tells the Solidity compiler to compile only from v0.8.13 to v0.9.0
 pragma solidity ^0.8.13;
 
-import "../interfaces/IERC20.sol";
+import "../interfaces/IWStETH.sol";
 
 // This coin-like contract is meant to test the reward flow aspects of the 
 // overarching project. It will be rebasing over time, to emulate a yield
 // bearing asset.
 
-contract MockCoin is IERC20 {
+contract MockCoin is IWStETH {
     mapping (address => uint) private _balances;
     uint public total_supply = 10000e18;
     uint constant public TOTAL_PERCENT = 10000e18; 

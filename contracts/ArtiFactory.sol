@@ -13,7 +13,7 @@ contract Artifactory is IArtifactory {
     }
 
     function createArtifact(address builderAddr, address honorAddr, string memory artifactLoc) public override returns(address) {
-        // require(owner==msg.sender, 'Only honorAddress can createArtifact');
+        // require(owner == msg.sender, 'Only honorAddress can createArtifact');
         return address(new Artifact(builderAddr, honorAddr, artifactLoc));
     }
 }

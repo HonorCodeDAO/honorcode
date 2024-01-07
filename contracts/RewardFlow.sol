@@ -130,14 +130,15 @@ contract RewardFlow is IRewardFlow {
         address target, uint rewardAmt) {
         receiveVSR();
         // Let's prevent unnecessary loops / propogation 
-        if (BQueue.isEmpty(bq) || (availableReward == 0) || _lastUpdated > block.timestamp) { 
+        if ((availableReward == 0) || _lastUpdated > block.timestamp) { 
             return (address(this), 0);
         }
         address rewarderAddr = BQueue.peek(bq);
         IArtifact artifact_ = IArtifact(artifactAddr);
         uint nextV = artifact_.updateAccumulated(rewarderAddr);
-        // uint nextV = artifact_.balanceOf(rewarderAddr);
 
+        // Changing this first should prevent cycles at gate above, even though
+        // there's no way for sender to be called via transfer (only RFs).
         _lastUpdated = uint32(block.timestamp);
         if (nextV == 0 || allocations[rewarderAddr].amount == 0 || (
             positions[rewarderAddr] == 0)) {
@@ -162,7 +163,6 @@ contract RewardFlow is IRewardFlow {
 
         uint amtToMove = availableReward * nextV / (
             artifact_.accRewardClaim(artifactAddr) * 2 * FRACTION_TO_PASS);
-            // artifact_.totalSupply() * 2 * FRACTION_TO_PASS);
         rewardAmt = amtToMove * alloc / MAX_ALLOC;
         BQueue.requeue(bq);
 

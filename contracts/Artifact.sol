@@ -13,6 +13,9 @@ import "../interfaces/IRewardFlowFactory.sol";
 // A "vouch" is comprised of a transfer of HONOR from one artifact to another, 
 // by a holder of the first. HONOR is removed from the sender's balance for this 
 // artifact, and added to the vouchee artifact.
+// In return, some amount of vouch claim token will be redeemed/burned to the 
+// sending artifact, and minted from the receiving one. This will occur 
+// according to a two-way quadratic bonding curve.
 
 
 contract Artifact is IArtifact {
@@ -33,7 +36,6 @@ contract Artifact is IArtifact {
     uint public honorWithin;
     int public netHonor;
     uint public accHonorHours;
-    // uint public builderHonor;
     bool public isValidated;
     address public rewardFlow;
 
@@ -46,8 +48,6 @@ contract Artifact is IArtifact {
         location = artifactLoc;
         honorAddr = honorAddress;
         _balances[builderAddr] = 0;
-        // Default is to keep all flow to this artifact.
-        // budgetFlow[address(this)] = 1 << 32 - 1;
         _lastUpdated = uint32(block.timestamp);
         _accRewardClaims[address(this)] = 0;
         _lastUpdatedVouch[address(this)] = uint32(block.timestamp);

@@ -1,7 +1,7 @@
 pragma solidity ^0.8.13;
 
 import "../interfaces/IArtifact.sol";
-import "../interfaces/IERC20.sol";
+import "../interfaces/IWStETH.sol";
 import "../interfaces/IGeras.sol";
 import "../interfaces/IRewardFlow.sol";
 import "../interfaces/ISTT.sol";
@@ -66,10 +66,10 @@ contract Geras is IGeras {
      */
     function stakeAsset(address stakeTarget) external override returns (uint) {
         require(stakeTarget == rootArtifact, 'Only stake with root artifact');
-        uint totalShares = IERC20(stakedAssetAddr).balanceOf(address(this));
+        uint totalShares = IWStETH(stakedAssetAddr).balanceOf(address(this));
 
         require(totalShares > stakedShares, 'No asset transferred to stake'); 
-        uint amt = IERC20(stakedAssetAddr).getStETHByWstETH(
+        uint amt = IWStETH(stakedAssetAddr).getStETHByWstETH(
             totalShares - stakedShares);
         _stakedAsset[stakeTarget] += amt;
         
@@ -119,7 +119,7 @@ contract Geras is IGeras {
         _stakedAsset[stakeTarget] -= amount;
         _stakedAssetBalances[msg.sender] -= amount;
         totalVirtualStakedAsset -= amount;
-        IERC20(stakedAssetAddr).transfer(msg.sender, amount);
+        IWStETH(stakedAssetAddr).transfer(msg.sender, amount);
     }
 
     function distributeGeras(address rewardFlowAddr) public {
@@ -132,6 +132,7 @@ contract Geras is IGeras {
         uint newGerasPerYear = _stakedAsset[rootArtifact] * 32 / 1024;
         _lastUpdated = uint32(block.timestamp);
         _mint(rewardFlowAddr, timeElapsed * newGerasPerYear / 31536000); 
+        IRewardFlow(rewardFlowAddr).receiveVSR();
         // IRewardFlow(rewardFlowAddr).payForward();
     }
 
@@ -144,7 +145,7 @@ contract Geras is IGeras {
         // For now, only owner can distribute the staked asset for Geras.
         require(msg.sender == ISTT(honorAddr).owner(), 
             'Only owner can distributeReward');
-        require(claimableReward + amountToDistribute <= IERC20(
+        require(claimableReward + amountToDistribute <= IWStETH(
             stakedAssetAddr).balanceOf(address(this)) - totalVirtualStakedAsset,
             'Geras: payout xceeds VSA rewards'
         );
@@ -168,12 +169,12 @@ contract Geras is IGeras {
         vsrClaim = gerasClaim * claimableConversionRate / 1024;
 
         require(vsrClaim <= claimableReward, 'Claim reward exceeds claimable');
-        require(vsrClaim <= IERC20(stakedAssetAddr).balanceOf(address(this)), 
+        require(vsrClaim <= IWStETH(stakedAssetAddr).balanceOf(address(this)), 
             'Insufficient VSA to claim reward');
 
         claimableReward -= vsrClaim;
         _burn(msg.sender, gerasClaim);
-        IERC20(stakedAssetAddr).transfer(claimer, vsrClaim);
+        IWStETH(stakedAssetAddr).transfer(claimer, vsrClaim);
     }
 
     function transfer(address sender, address recipient, uint256 amount) 
@@ -209,4 +210,7 @@ contract Geras is IGeras {
         emit Transfer(account, address(0), amount);
     }
 
+    function totalSupply() external override view returns (uint256) {
+        return _totalSupply;
+    }
 }

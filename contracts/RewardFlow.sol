@@ -31,7 +31,6 @@ contract RewardFlowFactory is IRewardFlowFactory {
 
     constructor(address honorAddr) {
         honorAddress = honorAddr;
-        ISTT(honorAddr).setRewardFlowFactory();
     }
 
     function getArtiToRF(address artiOrRF) external override view 
@@ -65,10 +64,11 @@ contract RewardFlow is IRewardFlow {
     // We can allow individuals to maintain their own partial allocations,
     // and if their 'budgets' entry is non-existent, assume the allocation is 
     // the full amount.  
+    // NOTE: we have disabled the partial allocation procedure for now, to limit
+    // complexity.
     mapping (address => Allocation) allocations;
-    mapping (address => BudgetQ) budgets;
     mapping (address => uint) positions; 
-
+    // mapping (address => BudgetQ) budgets;
 
     uint8 constant public FRACTION_TO_PASS = 4; 
     // uint32 constant public RATE_TO_ACCRUE = 100000;
@@ -151,15 +151,11 @@ contract RewardFlow is IRewardFlow {
                 BQueue.requeue(bq);
                 return (address(this), 0); 
             }
-            // nextV = artifact_.totalSupply() / 2;
             nextV = artifact_.accRewardClaim(artifactAddr) / 2;
         }
 
         target = allocations[rewarderAddr].target; 
         uint alloc = uint(allocations[rewarderAddr].amount);
-
-        // uint32 timeElapsed = uint32(block.timestamp) - _lastUpdated;
-        // uint amtToMove = SafeMath.max(availableReward, availableReward * timeElapsed / RATE_TO_ACCRUE);
 
         uint amtToMove = availableReward * nextV / (
             artifact_.accRewardClaim(artifactAddr) * 2 * FRACTION_TO_PASS);
@@ -210,6 +206,7 @@ contract RewardFlow is IRewardFlow {
 
         if (allocAmt == 0) {
             positions[msg.sender] = 0;
+            return 0;
         }
         if (positions[msg.sender] > 0) {
             queuePosition = positions[msg.sender];

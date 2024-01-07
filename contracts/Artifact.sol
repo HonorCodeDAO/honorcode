@@ -14,7 +14,7 @@ import "../interfaces/IRewardFlowFactory.sol";
 // by a holder of the first. HONOR is removed from the sender's balance for this 
 // artifact, and added to the vouchee artifact.
 // In return, some amount of vouch claim token will be redeemed/burned to the 
-// sending artifact, and minted from the receiving one. This will occur 
+// sending artifact, and minted from the receiving one. This will be governed 
 // according to a two-way quadratic bonding curve.
 
 
@@ -27,19 +27,20 @@ contract Artifact is IArtifact {
     // These mappings are necessary to track the relative share of each claim.
     // The reward flows are time-weighted, so they need to be synced together.
     mapping (address => uint) private _accRewardClaims;
-    mapping (address => uint) private _lastUpdatedVouch;
+    mapping (address => uint32) private _lastUpdatedVouch;
 
     string public location; 
     address public honorAddr;
     address public builder;
-    uint public antihonorWithin;
     uint public honorWithin;
-    int public netHonor;
     uint public accHonorHours;
     bool public isValidated;
     address public rewardFlow;
 
-
+    // Currently unutilized but making room for future extensions.
+    uint public antihonorWithin;
+    int public netHonor;
+    
     constructor(
         address builderAddr,  
         address honorAddress, 
@@ -54,10 +55,11 @@ contract Artifact is IArtifact {
     }
 
     /* 
-     * Intended to be used only once upon initialization.
+     * Intended to be used only once upon initialization/validation.
      * We can safely take the square root since there is no other amount in this 
      * artifact. By setting the square root baseline = 2^60 once, we don't need 
-     * it for the other ratios.
+     * it for the other ratios. Here, we could probably use fixed values for 
+     * the VALIDATE_AMT but this illustrates the bonding process.
      * Unfortunately, we cannot simply take the HONOR deposited to this artifact
      * because the honor contract will not have been constructed for the root. 
      */
@@ -96,16 +98,16 @@ contract Artifact is IArtifact {
         _accRewardClaims[address(this)] += _totalSupply * (
             uint32(block.timestamp) - _lastUpdatedVouch[address(this)]);
         _lastUpdatedVouch[address(this)] = uint32(block.timestamp);
+
         if (voucher == address(this)) { return _accRewardClaims[address(this)];}
         if (_lastUpdatedVouch[voucher] != 0) {
             if (_balances[voucher] == 0) { return _accRewardClaims[voucher]; }
-            _accRewardClaims[voucher] = _accRewardClaims[voucher] + _balances[voucher] * (
+            _accRewardClaims[voucher] += _balances[voucher] * (
                 uint32(block.timestamp) - _lastUpdatedVouch[voucher]);
         }
         _lastUpdatedVouch[voucher] = uint32(block.timestamp);
         return _accRewardClaims[voucher];
     }
-
 
     /**
       * Given some amount to redeem by the artifact's RF contract, check how  
@@ -142,10 +144,10 @@ contract Artifact is IArtifact {
     */
     function vouch(address account) external override returns(uint vouchAmt) {
         uint totalHonor = ISTT(honorAddr).balanceOf(address(this));
-        uint deposit = SafeMath.sub(totalHonor, honorWithin);
+        require(totalHonor > honorWithin, 'No new HONOR added to vouch');
+        uint deposit = totalHonor - honorWithin;
 
         updateAccumulated(account);
-        // updateAccumulated(address(this));
 
         if (SafeMath.floorSqrt(honorWithin) > 2**10) {
             vouchAmt = ((((SafeMath.floorSqrt(totalHonor)) * _totalSupply) / ( 
@@ -162,19 +164,18 @@ contract Artifact is IArtifact {
     }
 
     /** 
-       Given some valid input vouching claim to this artifact, return the honor. 
+       Given some valid input vouching claim to this artifact, return the HONOR. 
        Delta(H) is calculated as:
        H_out = H_T - (H_T * (V_T - V_in)^2) / V_T^2
 
        OR 
 
-       V_in = V_T - (V_T * sqrt(H_T - H_out) / sqrt(H_T)
+       V_in = V_T - (V_T * sqrt(H_T - H_out) / sqrt(H_T))
     */
     function unvouch(address account, uint unvouchAmt, bool isHonor) 
     external override returns(uint hnrAmt) {
         require(account == msg.sender || msg.sender == honorAddr, 
             'Only Honor or sender can unvouch');
-        // updateAccumulated(address(this));
         updateAccumulated(account);
 
         if (!isHonor) {
@@ -246,8 +247,8 @@ contract Artifact is IArtifact {
         if (ISTT(honorAddr).rootArtifact() == address(this)) { 
             return 0; 
         }
-        uint64 timeElapsed = uint32(block.timestamp) - _lastUpdated;
-        uint newHonorQtrs = (uint(timeElapsed) * honorWithin) / 7776000;
+        uint newHonorQtrs = ((block.timestamp - uint(_lastUpdated)) * (
+            honorWithin)) / 7776000;
         newBuilderVouchAmt = (SafeMath.floorCbrt(
             (accHonorHours + newHonorQtrs)) << 40) - (
             SafeMath.floorCbrt(accHonorHours) << 40);
@@ -262,14 +263,11 @@ contract Artifact is IArtifact {
     }
 
     function balanceOf(address addr) public view returns(uint) {
-        // if (addr==address(this)) {
-        //     return _balances[msg.sender];
-        // }
         return _balances[addr];
     }
 
     function setRewardFlow() external override returns(address) {
-        require(rewardFlow == address(0), 'Artifact rewardFlow already set');
+        // require(rewardFlow == address(0), 'Artifact rewardFlow already set');
         require(ISTT(honorAddr).rewardFlowFactory() == IRewardFlow(
             msg.sender).rfFactory(), 'Invalid rewardFlowFactory');
         require(IRewardFlowFactory(IRewardFlow(

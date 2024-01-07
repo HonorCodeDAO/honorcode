@@ -19,8 +19,7 @@ contract Honor is ISTT {
     mapping (address => uint) private _balances;
     uint private _lastUpdated;
     address public rootArtifact;
-    // Assumed to be a liquid staking asset.
-    address public stakedAssetAddr;
+    // Geras represents a virtual staked asset.
     address public gerasAddr;
     address public rewardFlowFactory;
     address public owner;
@@ -31,7 +30,6 @@ contract Honor is ISTT {
 
     constructor(
         address artifactoryAddress, 
-        address stakedAssetAddress, 
         string memory honorName) {
         artifactoryAddr = artifactoryAddress;
         rootArtifact = (IArtifactory(artifactoryAddr).createArtifact(
@@ -41,7 +39,6 @@ contract Honor is ISTT {
         IArtifact(rootArtifact).initVouch(msg.sender, 10000e18);
 
         IArtifact(rootArtifact).validate();
-        stakedAssetAddr = stakedAssetAddress;
         _lastUpdated = block.timestamp;
         owner = msg.sender;
         name = honorName;
@@ -52,9 +49,11 @@ contract Honor is ISTT {
         owner = newOwner;
     }
 
-    function setRewardFlowFactory() external override {
-        require(rewardFlowFactory == address(0), 'RF factory already set');
-        rewardFlowFactory = msg.sender;
+    function setRewardFlowFactory(address rfFactory) external override {
+        // Disable this requirement in case we need to replace it. 
+        // require(rewardFlowFactory == address(0), 'RF factory already set');
+        require(msg.sender == owner, 'Only owner can modify RewardFlowFactory');
+        rewardFlowFactory = rfFactory;
     }
 
     function setGeras(address gerasAddress) external override {
@@ -93,13 +92,12 @@ contract Honor is ISTT {
      */ 
     function vouch(address _from, address _to, uint amount) external override 
     returns(uint revouchAmt) {
+        require(IArtifact(_from).honorAddr() == address(this), 
+            'HONOR: artifact doesnt exist');
         require(_balances[_to] != 0 && _balances[_from] != 0 && (
-            IArtifact(_to).isValidated()), 
-            "Inval vouch");
+            IArtifact(_to).isValidated()), "HONOR: Invalid vouch");
         require(IArtifact(_from).balanceOf(msg.sender) >= amount, 
             "HONOR: Insuff. vouch bal");
-        require(IArtifact(_from).honorAddr() == address(this), 
-            'artifact doesnt exist');
 
         uint hnrAmt = IArtifact(_from).unvouch(msg.sender, amount, false);
         _transfer(_from, _to, hnrAmt);
@@ -129,21 +127,21 @@ contract Honor is ISTT {
 
         // Most of the time, we would expect a two-stage propose/validate process,
         // but allow this for convenience.
-        if (should_validate) {IArtifact(proposedAddr).validate();}
+        if (should_validate) { IArtifact(proposedAddr).validate(); }
     }
 
     /* 
      * After an artifact is proposed, it will need to be validated to be fully 
      * vouchable. This process should involve some version of token curation but 
      * for now requires additional HONOR commitment. 
+     * The main difference between validated and unvalidated artifacts is 
+     * the builder does not accumulate claims for the former. 
      */
     function validateArtifact(address _from, address addr) 
     external override returns(bool validated) { 
         if (IArtifact(addr).isValidated() && _balances[addr] > 0) {return true;}
         require(IArtifact(_from).balanceOf(msg.sender) >= VALIDATE_AMT, 
             "Insuff. val bal");
-        require(IArtifact(addr).builder() != msg.sender, 
-            'Builder cannot validate');
 
         uint hnrAmt = IArtifact(_from).unvouch(msg.sender, VALIDATE_AMT, true);
         _transfer(_from, addr, hnrAmt);
@@ -152,18 +150,11 @@ contract Honor is ISTT {
         return IArtifact(addr).validate();
     }
 
-    function _mint(address account, uint256 amount) internal virtual {
-        // require(account != address(0), "ERC20: mint to the zero address");
-
-        _totalSupply += amount;
-        _balances[account] += amount;
-        emit Transfer(address(0), account, amount);
-    }
-
     /*
      *  We compute the rate at which HONOR is farmed out from a square root of 
      *  the total amount of VSA staked. The pivot point where the annual rate
-     *  equals staked asset is 2^70 (~1000 ETH). 
+     *  equals staked asset is 2^70 (~1000 ETH). Which means we multiply the 
+     *  square root by 2^35.
     */
     function mintToStakers() public returns(uint farmedHonor) {
         uint stakeAmt = SafeMath.floorSqrt(
@@ -190,10 +181,19 @@ contract Honor is ISTT {
         return _stakingMintPool;
     }
 
+
+    function _mint(address account, uint256 amount) internal virtual {
+        _totalSupply += amount;
+        _balances[account] += amount;
+        emit Transfer(address(0), account, amount);
+    }
+
+    /*
+     *  We define semi-transferability as only allowing transfers internally, 
+     *  which can only happen when proposing or vouching artifacts. 
+    */
     function _transfer(address sender, address recipient, uint256 amount) 
     internal virtual {
-        // require(sender != address(0), "HONOR: transfer from zero");
-        // require(recipient != address(0), "HONOR: transfer to zero");
         // require(IArtifact(recipient).isValidated(), 'recipient not validated');
 
         uint256 senderBalance = _balances[sender];

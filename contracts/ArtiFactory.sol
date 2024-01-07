@@ -12,8 +12,9 @@ contract Artifactory is IArtifactory {
         owner = msg.sender;
     }
 
-    function createArtifact(address builderAddr, address honorAddr, string memory artifactLoc) public override returns(address) {
-        // require(owner == msg.sender, 'Only honorAddress can createArtifact');
+    function createArtifact(address builderAddr, address honorAddr, 
+        string memory artifactLoc) public override returns(address) {
+        require(honorAddr == msg.sender, 'Only HONOR can createArtifact');
         return address(new Artifact(builderAddr, honorAddr, artifactLoc));
     }
 }

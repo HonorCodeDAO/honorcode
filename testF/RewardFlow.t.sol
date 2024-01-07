@@ -20,18 +20,16 @@ contract RewardFlowTest is Test {
     MockCoin public mockERC;
 
     function setUp() public {
-        // HonorFactory hfact = new HonorFactory();
         afact = new Artifactory();
         mockERC = new MockCoin();
-        // hnr = Honor(hfact.createHonor(address(afact), address(mockERC), 
-        //     'TEST_HONOR'));
-        hnr = new Honor(address(afact), address(mockERC), 'TEST_HONOR');
+        hnr = new Honor(address(afact), 'TEST_HONOR');
 
         root = Artifact(hnr.rootArtifact());
-        geras = new Geras(address(hnr));
+        geras = new Geras(address(hnr), address(mockERC));
         hnr.setGeras(address(geras));
 
         rfact = new RewardFlowFactory(address(hnr));
+        hnr.setRewardFlowFactory(address(rfact));
         rootRF = RewardFlow(rfact.createRewardFlow(address(root), address(geras)));
 
     }

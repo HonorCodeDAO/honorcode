@@ -5,7 +5,6 @@ import {Honor} from "../contracts/Honor.sol";
 import {Artifact} from "../contracts/Artifact.sol";
 // import {HonorFactory} from "../contracts/HonorFactory.sol";
 import {Artifactory} from "../contracts/Artifactory.sol";
-import {MockCoin} from "../contracts/MockCoin.sol";
 import {SafeMath} from "../contracts/SafeMath.sol";
 
 contract HonorTest is Test {
@@ -14,12 +13,10 @@ contract HonorTest is Test {
     Artifact public root;
 
     function setUp() public {
-        // HonorFactory hfact = new HonorFactory();
         afact = new Artifactory();
-        MockCoin mockERC = new MockCoin();
-        // hnr = Honor(hfact.createHonor(address(afact), address(mockERC), 
-        //     'TEST_HONOR'));
-        hnr = new Honor(address(afact), address(mockERC), 'TEST_HONOR');
+        hnr = new Honor(address(afact), 'TEST_HONOR');
+        // HonorFactory hfact = new HonorFactory();
+        // hnr = Honor(hfact.createHonor(address(afact), 'TEST_HONOR'));
 
         root = Artifact(hnr.rootArtifact());
 

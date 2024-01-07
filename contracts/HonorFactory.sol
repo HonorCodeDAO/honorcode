@@ -12,12 +12,11 @@ contract HonorFactory {
 
     function createHonor(
         address artifactoryAddress, 
-        address stakedAssetAddress, 
         string memory name) 
     public returns(address) {
 
         honorRegistry[artifactoryAddress] = address(
-            new Honor(artifactoryAddress, stakedAssetAddress, name));
+            new Honor(artifactoryAddress, name));
         honorRegistry[honorRegistry[artifactoryAddress]] = artifactoryAddress;
         return honorRegistry[artifactoryAddress];
     }

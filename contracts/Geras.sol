@@ -34,10 +34,10 @@ contract Geras is IGeras {
     mapping (address => uint) private _lastUpdatedStake;
 
 
-    constructor(address hnrAddr) {
+    constructor(address hnrAddr, address _stakedAssetAddr) {
         rootArtifact = ISTT(hnrAddr).rootArtifact();
         honorAddr = hnrAddr;
-        stakedAssetAddr = ISTT(hnrAddr).stakedAssetAddr();
+        stakedAssetAddr = _stakedAssetAddr;
         _lastUpdated = uint32(block.timestamp);
     }
 

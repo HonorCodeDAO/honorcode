@@ -36,10 +36,10 @@ contract InvariantHonorTest is Test {
         mockERC = new MockCoin();
         vm.stopPrank();
 
-        hnr = new Honor(address(afact), address(mockERC), 'TEST_HONOR');
+        hnr = new Honor(address(afact), 'TEST_HONOR');
 
         root = Artifact(hnr.rootArtifact());
-        geras = new Geras(address(hnr));
+        geras = new Geras(address(hnr), address(mockERC));
         hnr.setGeras(address(geras));
 
         vm.startPrank(staker);
@@ -51,7 +51,9 @@ contract InvariantHonorTest is Test {
         address newB = hnr.proposeArtifact(address(root), address(7), 'B', true);
 
         rfact = new RewardFlowFactory(address(hnr));
+        hnr.setRewardFlowFactory(address(rfact));
         rootRF = RewardFlow(rfact.createRewardFlow(address(root), address(geras)));
+
         address rootRFA = address(RewardFlow(rfact.createRewardFlow(newA, address(geras))));
         address rootRFB = address(RewardFlow(rfact.createRewardFlow(newB, address(geras))));
 

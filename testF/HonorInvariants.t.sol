@@ -74,13 +74,14 @@ contract InvariantHonorTest is Test {
         uint gBalance;
         uint rfBalance;
         for (uint i; i < 3; i++) {
-            gBalance += geras.balanceOf(rfH.rfs(i));
+            gBalance += geras.vsaBalanceOf(rfH.rfs(i));
             IRewardFlow(rfH.rfs(i)).receiveVSR();
             rfBalance += IRewardFlow(rfH.rfs(i)).totalGeras();
-            assertEq(geras.balanceOf(rfH.rfs(i)), IRewardFlow(rfH.rfs(i)).totalGeras(), new string(i));
+            assertEq(geras.vsaBalanceOf(rfH.rfs(i)), 
+                IRewardFlow(rfH.rfs(i)).totalGeras(), new string(i));
         }
-        assertEq(gBalance, geras.totalSupply(), 'RF geras imbalance');
-        assertEq(rfBalance, geras.totalSupply(), 'RF totalgeras imbalance');
+        assertEq(gBalance, geras.totalVSASupply(), 'RF geras imbalance');
+        assertEq(rfBalance, geras.totalVSASupply(), 'RF totalgeras imbalance');
     }
 
     function invariant_HonorBalance() public {

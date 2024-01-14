@@ -61,7 +61,7 @@ contract RewardFlowTest is Test {
         mockERC.transfer(address(geras), mockAmt);
         geras.stakeAsset(address(root));
 
-        uint amtStaked = geras.totalVirtualStakedAsset();
+        uint amtStaked = geras.totalSupply();
         uint lastUp = geras.lastUpdated();
 
         uint vouchAmt = hnr.vouch(address(root), newA, amount);
@@ -77,12 +77,12 @@ contract RewardFlowTest is Test {
 
         // assertEq(uint32(block.timestamp) - lastUp, duration, 'duration not exact');
 
-        // assertEq(geras.getStakedAsset(builder), geras.totalVirtualStakedAsset(), 'total staked incorrect');
-        assertEq(amtStaked, geras.totalVirtualStakedAsset(), 'total amt staked incorrect');
+        // assertEq(geras.getStakedAsset(builder), geras.totalSupply(), 'total staked incorrect');
+        assertEq(amtStaked, geras.totalSupply(), 'total amt staked incorrect');
 
-        uint expStartingGeras = amtStaked * (duration-1) * 32 / 1024 / 31536000 ;
+        uint expStartingGeras = (amtStaked * 32 / 1024) *(duration-1) / 31536000;
 
-        assertEq(geras.balanceOf(address(rootRF)), expStartingGeras, 
+        assertEq(geras.vsaBalanceOf(address(rootRF)), expStartingGeras, 
             'expected starting Geras in root incorrect');
 
         rootRF.payForward();
@@ -99,10 +99,10 @@ contract RewardFlowTest is Test {
 
         assertEq(accbuilderRootVouch, accTotalRootVouch, 'acc vouch in root incorrect');
 
-        assertEq(geras.balanceOf(newRF), availableGeras * accbuilderRootVouch / (8*accTotalRootVouch) * 128/255, 
+        assertEq(geras.vsaBalanceOf(newRF), availableGeras * accbuilderRootVouch / (8*accTotalRootVouch) * 128/255, 
             'expected Geras in new address incorrect');
 
-        assertEq(geras.balanceOf(address(rootRF)), expStartingGeras- availableGeras * accbuilderRootVouch / (8*accTotalRootVouch) * 128/255 , 
+        assertEq(geras.vsaBalanceOf(address(rootRF)), expStartingGeras- availableGeras * accbuilderRootVouch / (8*accTotalRootVouch) * 128/255 , 
             'expected Geras in root address incorrect');
     }
 
@@ -120,7 +120,7 @@ contract RewardFlowTest is Test {
         address newA = hnr.proposeArtifact(address(root), address(808), 'newA', true);
 
         // Will be minted at an annual rate.
-        uint farmedHonor = (SafeMath.floorSqrt(geras.totalVirtualStakedAsset()) << 35);
+        uint farmedHonor = (SafeMath.floorSqrt(geras.totalSupply()) << 35);
         farmedHonor = duration * farmedHonor / 31536000;
 
         vm.warp(block.timestamp + duration);
@@ -149,9 +149,8 @@ contract RewardFlowTest is Test {
         assertEq(hnr.totalSupply(), rootHonor + hnr.balanceOf(address(newA)), 
             'total hnr supply incorrect');
 
-
         geras.unstakeAsset(address(root), mockAmt);
-        assertEq(geras.totalVirtualStakedAsset(), 0, 'leftover VSR');
+        assertEq(geras.totalSupply(), 0, 'leftover VSR');
         assertEq(mockERC.balanceOf(builder), 10000 ether, 'missing ERC');
 
     }
@@ -176,7 +175,7 @@ contract RewardFlowTest is Test {
         mockERC.transfer(address(geras), mockAmt);
         geras.stakeAsset(address(root));
 
-        uint amtStaked = geras.totalVirtualStakedAsset();
+        uint amtStaked = geras.totalSupply();
         uint lastUp = geras.lastUpdated();
 
         uint vouchAmt = hnr.vouch(address(root), newA, amount);
@@ -197,12 +196,12 @@ contract RewardFlowTest is Test {
 
         // assertEq(uint32(block.timestamp) - lastUp, duration, 'duration not exact');
 
-        // assertEq(geras.getStakedAsset(builder), geras.totalVirtualStakedAsset(), 'total staked incorrect');
-        assertEq(amtStaked, geras.totalVirtualStakedAsset(), 'total amt staked incorrect');
+        // assertEq(geras.getStakedAsset(builder), geras.totalSupply(), 'total staked incorrect');
+        assertEq(amtStaked, geras.totalSupply(), 'total amt staked incorrect');
 
-        uint expStartingGeras = amtStaked * (duration-1) * 32 / 1024 / 31536000 ;
+        uint expStartingGeras = (amtStaked  * 32 / 1024) * (duration-1) / 31536000;
 
-        assertEq(geras.balanceOf(address(rootRF)), expStartingGeras, 
+        assertEq(geras.vsaBalanceOf(address(rootRF)), expStartingGeras, 
             'expected starting Geras in root incorrect');
 
         vm.warp(block.timestamp + duration);
@@ -221,12 +220,12 @@ contract RewardFlowTest is Test {
 
         assertEq(accbuilderRootVouch, accTotalRootVouch, 'acc vouch in root incorrect');
 
-        // assertEq(geras.balanceOf(newRF), availableGeras/ 8 * 128/255 * builderRootVouch / root.totalSupply(), 
+        // assertEq(geras.vsaBalanceOf(newRF), availableGeras/ 8 * 128/255 * builderRootVouch / root.totalSupply(), 
         //     'expected Geras in new address incorrect');
-        assertEq(geras.balanceOf(newRF), availableGeras/ 8 * 128/255 * accbuilderRootVouch / accTotalRootVouch, 
+        assertEq(geras.vsaBalanceOf(newRF), availableGeras/ 8 * 128/255 * accbuilderRootVouch / accTotalRootVouch, 
             'expected Geras in new address incorrect');
 
-        assertEq(geras.balanceOf(address(rootRF)), expStartingGeras- availableGeras / 8* 128/255 * builderRootVouch / root.totalSupply(), 
+        assertEq(geras.vsaBalanceOf(address(rootRF)), expStartingGeras- availableGeras / 8* 128/255 * builderRootVouch / root.totalSupply(), 
             'expected Geras in root address incorrect');
 
         vm.warp(block.timestamp + duration - 1);
@@ -235,7 +234,7 @@ contract RewardFlowTest is Test {
             RewardFlow(newRF).payForward();
         }
         RewardFlow(newRF).receiveVSR();
-        uint newExpectedGerasA = geras.balanceOf(newRF);
+        uint newExpectedGerasA = geras.vsaBalanceOf(newRF);
         uint availableGerasA = RewardFlow(newRF).availableReward();
         vm.warp(block.timestamp + duration);
         RewardFlow(newRF).payForward();
@@ -253,10 +252,10 @@ contract RewardFlowTest is Test {
         // assertEq(accbuilderVouchA + accbuilderAVouchA, accTotalVouchA, 
         //     'acc vouch in newA incorrect');
 
-        assertEq(geras.balanceOf(newRFB), availableGerasA *  accbuilderVouchA / (8* accTotalVouchA) *128 / 255 , 
+        assertEq(geras.vsaBalanceOf(newRFB), availableGerasA *  accbuilderVouchA / (8* accTotalVouchA) *128 / 255 , 
             'expected Geras in third address incorrect');
 
-        assertEq(geras.balanceOf(newRF), newExpectedGerasA- availableGerasA *  accbuilderVouchA / (8*accTotalVouchA) *128 /255, 
+        assertEq(geras.vsaBalanceOf(newRF), newExpectedGerasA- availableGerasA *  accbuilderVouchA / (8*accTotalVouchA) *128 /255, 
             'expected Geras in middle address incorrect');
 
     }

@@ -113,9 +113,9 @@ contract RewardFlow is IRewardFlow {
     // Add some to the amount available to be paid out to others. The remainder
     // will stay in this rewardflow. 
     function receiveVSR() public override returns (uint amtToReceive) {
-        require(IGeras(gerasAddr).balanceOf(address(this)) >= totalGeras,
+        require(IGeras(gerasAddr).vsaBalanceOf(address(this)) >= totalGeras,
             'Total Geras less than balance');
-        amtToReceive =  IGeras(gerasAddr).balanceOf(address(this)) - totalGeras;
+        amtToReceive = IGeras(gerasAddr).vsaBalanceOf(address(this)) - totalGeras;
         totalGeras += amtToReceive;
         availableReward += amtToReceive;
     }
@@ -167,7 +167,7 @@ contract RewardFlow is IRewardFlow {
         }
 
         if (target != address(this)) {
-            IGeras(gerasAddr).transfer(address(this), target, rewardAmt);
+            IGeras(gerasAddr).vsaTransfer(address(this), target, rewardAmt);
             totalGeras -= rewardAmt;
         }
         availableReward -= amtToMove;
@@ -236,10 +236,10 @@ contract RewardFlow is IRewardFlow {
         uint totalClaim = IArtifact(artifactAddr).accRewardClaim(artifactAddr);
         uint availableClaim = IArtifact(artifactAddr).accRewardClaim(claimer);
         require(totalClaim > 0, 'RF: Total claim is zero');
-        require(IGeras(gerasAddr).balanceOf(address(this)) > availableReward, 
+        require(IGeras(gerasAddr).vsaBalanceOf(address(this)) > availableReward, 
             'No Geras is available');
 
-        availableGeras = (IGeras(gerasAddr).balanceOf(
+        availableGeras = (IGeras(gerasAddr).vsaBalanceOf(
             address(this)) - availableReward) * availableClaim / totalClaim;
 
         require(redeemAmt <= availableGeras, 'RF Redemption exceeds available');
@@ -250,7 +250,7 @@ contract RewardFlow is IRewardFlow {
         totalGeras -= redeemAmt;
 
         // This needs to convert into the actual asset and verify. 
-        // IGeras(gerasAddr).transfer(address(this), claimer, gerasAmt);
+        // IGeras(gerasAddr).vsaTransfer(address(this), claimer, gerasAmt);
         IGeras(gerasAddr).claimReward(redeemAmt, claimer);
     }
 

@@ -158,7 +158,7 @@ contract Honor is ISTT {
     */
     function mintToStakers() public returns(uint farmedHonor) {
         uint stakeAmt = SafeMath.floorSqrt(
-            IGeras(gerasAddr).totalVirtualStakedAsset()) << 35;
+            IGeras(gerasAddr).totalSupply()) << 35;
         // Will be minted at an annual rate.
         farmedHonor = ((block.timestamp - _lastUpdated) * stakeAmt) / 31536000;
         _lastUpdated = block.timestamp;

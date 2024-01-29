@@ -16,8 +16,10 @@ import "./SafeMath.sol";
 contract Honor is ISTT {
     uint private _totalSupply;
     uint private _stakingMintPool;
+    mapping (string => address) private _artifacts;
     mapping (address => uint) private _balances;
     uint private _lastUpdated;
+
     address public rootArtifact;
     // Geras represents a virtual staked asset.
     address public gerasAddr;
@@ -30,17 +32,19 @@ contract Honor is ISTT {
 
     constructor(
         address artifactoryAddress, 
-        string memory honorName) {
+        string memory honorName,
+        address _owner) {
         artifactoryAddr = artifactoryAddress;
         rootArtifact = (IArtifactory(artifactoryAddr).createArtifact(
-            msg.sender, address(this), "rootArtifact"));
+            _owner, address(this), "rootArtifact"));
 
         _mint(rootArtifact, 10000e18);
-        IArtifact(rootArtifact).initVouch(msg.sender, 10000e18);
+        IArtifact(rootArtifact).initVouch(_owner, 10000e18);
+        _artifacts["rootArtifact"] = rootArtifact;
 
         IArtifact(rootArtifact).validate();
         _lastUpdated = block.timestamp;
-        owner = msg.sender;
+        owner = _owner;
         name = honorName;
     }
 
@@ -85,6 +89,10 @@ contract Honor is ISTT {
         return IArtifact(addr).accHonorHours();
     }
 
+    function getArtifactAtLoc(string memory loc) external override view returns(address) {
+        return _artifacts[loc];
+    }
+
     /* 
      * The presiding HONOR contract will manage housekeeping between the available artifacts. 
      * This includes checking whether the destination is validated, and overseeing the 
@@ -92,7 +100,8 @@ contract Honor is ISTT {
      */ 
     function vouch(address _from, address _to, uint amount) external override 
     returns(uint revouchAmt) {
-        require(IArtifact(_from).honorAddr() == address(this), 
+        require((IArtifact(_from).honorAddr() == address(this)) && (
+            IArtifact(_to).honorAddr() == address(this)), 
             'HONOR: artifact doesnt exist');
         require(_balances[_to] != 0 && _balances[_from] != 0 && (
             IArtifact(_to).isValidated()), "HONOR: Invalid vouch");
@@ -120,6 +129,7 @@ contract Honor is ISTT {
             builder, address(this), loc));
 
         IArtifact(_from).unvouch(msg.sender, VALIDATE_AMT, true);
+        _artifacts[loc] = proposedAddr;
 
         _transfer(_from, proposedAddr, VALIDATE_AMT);
         IArtifact(proposedAddr).initVouch(msg.sender, VALIDATE_AMT);

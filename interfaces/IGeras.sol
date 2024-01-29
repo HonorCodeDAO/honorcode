@@ -10,6 +10,9 @@ interface IGeras {
     function totalVSASupply() external view returns(uint);
     function stakeAsset(address stakeTarget) external returns (uint);
     function getStakedAsset(address stakeTarget) external view returns (uint);
+    function getArtifactToRewardFlow(address) external returns (address);
+    function payForward(address) external returns (address, uint);
+    function submitAllocation(address, address, uint8) external returns (uint);
     function getHonorClaim(address account) external view returns (uint);
     function getLastUpdated(address account) external view returns (uint);
     function lastUpdated() external view returns (uint);

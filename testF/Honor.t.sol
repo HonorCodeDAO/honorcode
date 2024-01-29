@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 import {Test, console2} from "forge-std/Test.sol";
 import {Honor} from "../contracts/Honor.sol";
 import {Artifact} from "../contracts/Artifact.sol";
-// import {HonorFactory} from "../contracts/HonorFactory.sol";
+import {HonorFactory} from "../contracts/HonorFactory.sol";
 import {Artifactory} from "../contracts/Artifactory.sol";
 import {SafeMath} from "../contracts/SafeMath.sol";
 
@@ -14,9 +14,9 @@ contract HonorTest is Test {
 
     function setUp() public {
         afact = new Artifactory();
-        hnr = new Honor(address(afact), 'TEST_HONOR');
-        // HonorFactory hfact = new HonorFactory();
-        // hnr = Honor(hfact.createHonor(address(afact), 'TEST_HONOR'));
+        // hnr = new Honor(address(afact), 'TEST_HONOR');
+        HonorFactory hfact = new HonorFactory();
+        hnr = Honor(hfact.createHonor(address(afact), 'TEST_HONOR'));
 
         root = Artifact(hnr.rootArtifact());
 
@@ -25,10 +25,10 @@ contract HonorTest is Test {
     function testAddInitial() public {
         address builder = root.builder();
 
-        assertEq(hnr.name(), 'TEST_HONOR');
-        assertEq(hnr.owner(), builder);
-        assertEq(hnr.balanceOf(address(root)), 10000 ether);
-        assertEq(hnr.balanceOfArtifact(address(root), builder), SafeMath.floorSqrt(10000 ether) * (2 ** 30));
+        assertEq(hnr.name(), 'TEST_HONOR', 'name incorrect');
+        assertEq(hnr.owner(), builder, 'Owner != root');
+        assertEq(hnr.balanceOf(address(root)), 10000 ether, 'Mint amt incorrect');
+        assertEq(hnr.balanceOfArtifact(address(root), builder), SafeMath.floorSqrt(10000 ether) * (2 ** 30), 'root claim incorrect');
     }
 
 

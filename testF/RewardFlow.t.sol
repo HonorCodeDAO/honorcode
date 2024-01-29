@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 import {Test, console2} from "forge-std/Test.sol";
 import {Honor} from "../contracts/Honor.sol";
 import {Artifact} from "../contracts/Artifact.sol";
-// import {HonorFactory} from "../contracts/HonorFactory.sol";
+import {HonorFactory} from "../contracts/HonorFactory.sol";
 import {Artifactory} from "../contracts/Artifactory.sol";
 import {RewardFlow, RewardFlowFactory} from "../contracts/RewardFlow.sol";
 import {Geras} from "../contracts/Geras.sol";
@@ -22,7 +22,10 @@ contract RewardFlowTest is Test {
     function setUp() public {
         afact = new Artifactory();
         mockERC = new MockCoin();
-        hnr = new Honor(address(afact), 'TEST_HONOR');
+        // hnr = new Honor(address(afact), 'TEST_HONOR');
+
+        HonorFactory hfact = new HonorFactory();
+        hnr = Honor(hfact.createHonor(address(afact), 'TEST_HONOR'));
 
         root = Artifact(hnr.rootArtifact());
         geras = new Geras(address(hnr), address(mockERC));
@@ -30,6 +33,7 @@ contract RewardFlowTest is Test {
 
         rfact = new RewardFlowFactory(address(hnr));
         hnr.setRewardFlowFactory(address(rfact));
+        geras.setRewardFlowFactory(address(rfact));
         rootRF = RewardFlow(rfact.createRewardFlow(address(root), address(geras)));
 
     }
@@ -90,7 +94,8 @@ contract RewardFlowTest is Test {
         uint availableGeras = rootRF.availableReward();
         vm.warp(block.timestamp + duration);
 
-        rootRF.payForward();
+        // rootRF.payForward();
+        geras.payForward(address(root));
         vouchAmt = hnr.vouch(address(root), newA, amount / 1000);
 
         uint builderRootVouch = root.balanceOf(builder);

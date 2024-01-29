@@ -39,7 +39,7 @@ contract RewardFlowFactory is IRewardFlowFactory {
     }
 
     function createRewardFlow(address artifactAddr_, address gerasAddr_) 
-    public returns(address) {
+    external override returns(address) {
         require(artifactToRF[artifactAddr_] == address(0), 
             'RewardFlow for artifact exists');
         require(ISTT(honorAddress).balanceOf(artifactAddr_) != 0, 

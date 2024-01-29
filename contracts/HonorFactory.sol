@@ -16,7 +16,7 @@ contract HonorFactory {
     public returns(address) {
 
         honorRegistry[artifactoryAddress] = address(
-            new Honor(artifactoryAddress, name));
+            new Honor(artifactoryAddress, name, msg.sender));
         honorRegistry[honorRegistry[artifactoryAddress]] = artifactoryAddress;
         return honorRegistry[artifactoryAddress];
     }

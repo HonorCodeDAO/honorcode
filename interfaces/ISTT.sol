@@ -11,6 +11,7 @@ interface ISTT {
     function setGeras(address gerasAddress) external;
     function gerasAddr() external view returns(address);
     function rootArtifact() external view returns(address);
+    function getArtifactAtLoc(string memory loc) external view returns(address);
     function owner() external view returns(address);
     function rewardFlowFactory() external view returns(address);
     function stakingMintPool() external view returns (uint);

@@ -2,6 +2,7 @@ pragma solidity ^0.8.13;
 
 import {Test, console2} from "forge-std/Test.sol";
 import {Honor} from "../contracts/Honor.sol";
+import {HonorFactory} from "../contracts/HonorFactory.sol";
 import {HonorHandler} from "./handlers/HonorHandler.sol";
 import {RewardFlowHandler} from "./handlers/RewardFlowHandler.sol";
 import {Geras} from "../contracts/Geras.sol";
@@ -36,8 +37,11 @@ contract InvariantHonorTest is Test {
         mockERC = new MockCoin();
         vm.stopPrank();
 
-        hnr = new Honor(address(afact), 'TEST_HONOR');
+        // hnr = new Honor(address(afact), 'TEST_HONOR');
 
+        HonorFactory hfact = new HonorFactory();
+        hnr = Honor(hfact.createHonor(address(afact), 'TEST_HONOR'));
+            
         root = Artifact(hnr.rootArtifact());
         geras = new Geras(address(hnr), address(mockERC));
         hnr.setGeras(address(geras));
@@ -52,6 +56,7 @@ contract InvariantHonorTest is Test {
 
         rfact = new RewardFlowFactory(address(hnr));
         hnr.setRewardFlowFactory(address(rfact));
+        geras.setRewardFlowFactory(address(rfact));
         rootRF = RewardFlow(rfact.createRewardFlow(address(root), address(geras)));
 
         address rootRFA = address(RewardFlow(rfact.createRewardFlow(newA, address(geras))));

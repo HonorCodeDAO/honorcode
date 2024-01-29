@@ -4,6 +4,7 @@ import "../interfaces/IArtifact.sol";
 import "../interfaces/IWStETH.sol";
 import "../interfaces/IGeras.sol";
 import "../interfaces/IRewardFlow.sol";
+import "../interfaces/IRewardFlowFactory.sol";
 import "../interfaces/ISTT.sol";
 import "./SafeMath.sol";
 
@@ -12,6 +13,9 @@ import "./SafeMath.sol";
  * Geras represents the "spoils" of HONOR: in this case, a virtual staked asset. 
  * It is used to hold a staked asset, track the farmed HONOR claims for stakers, 
  * and disperse cash flow rewards to vouchers across the various artifacts.
+ * For the sake of convenience, we want this contract to be the manager for 
+ * RF-related functions, allowing us to use artifact addresses instead of RFs.
+ * In this way, Geras : RewardFlow :: Honor : Artifact.
  */ 
 contract Geras is IGeras {
     mapping (address => uint) private _vsaBalances;
@@ -20,6 +24,7 @@ contract Geras is IGeras {
     address public honorAddr;
     address public rootArtifact;
     address public stakedAssetAddr;
+    address public rewardFlowFactory;
     uint public stakedShares;
     uint public redeemableReward;
     uint public claimableReward;
@@ -59,6 +64,40 @@ contract Geras is IGeras {
     function balanceOf(address addr) public view returns(uint) {
         return _balances[addr]; 
     } 
+
+    function setRewardFlowFactory(address rfFactory) external {
+        require(rewardFlowFactory == address(0), 'RF factory already set');
+        require(msg.sender == ISTT(honorAddr).owner(), 
+            'Only owner can modify RewardFlowFactory');
+        rewardFlowFactory = rfFactory;
+    }
+
+    /** 
+     *  Wrapper for the RFFactory getArtiToRF function. 
+     */
+    function getArtifactToRewardFlow(address artifactOrRF) external override 
+    returns (address) {
+        return IRewardFlowFactory(rewardFlowFactory).getArtiToRF(artifactOrRF);
+    }
+
+    /** 
+     *  Wrapper for the RF Payforward function. 
+     */
+    function payForward(address artifactToPay) external override returns (
+        address target, uint amtToReceive) {
+        (target, amtToReceive) = IRewardFlow(IRewardFlowFactory(
+            rewardFlowFactory).getArtiToRF(artifactToPay)).payForward();
+    }
+    
+    /** 
+     *  Wrapper for the RF SubmitAllocation function. 
+     */
+    function submitAllocation(address artifactToAlloc, address targetAddr, 
+        uint8 allocAmt) external override returns (uint queuePosition) {
+        queuePosition = IRewardFlow(IRewardFlowFactory(
+            rewardFlowFactory).getArtiToRF(artifactToAlloc)).submitAllocation(
+                targetAddr, allocAmt);
+    }
 
     /**
      *  The wrapped asset will be passed into this contract in terms of shares.

@@ -27,10 +27,10 @@ struct Allocation {
 
 contract RewardFlowFactory is IRewardFlowFactory {
     mapping (address => address) artifactToRF;
-    address private honorAddress;
+    // address private honorAddress;
 
-    constructor(address honorAddr) {
-        honorAddress = honorAddr;
+    constructor() {
+        // honorAddress = honorAddr;
     }
 
     function getArtiToRF(address artiOrRF) external override view 
@@ -38,16 +38,15 @@ contract RewardFlowFactory is IRewardFlowFactory {
         return artifactToRF[artiOrRF];
     }
 
-    function createRewardFlow(address artifactAddr_, address gerasAddr_) 
-    external override returns(address) {
-        require(artifactToRF[artifactAddr_] == address(0), 
-            'RewardFlow for artifact exists');
-        require(ISTT(honorAddress).balanceOf(artifactAddr_) != 0, 
+    function createRewardFlow(address honorAddr, address artifactAddr_, 
+        address gerasAddr_) external override returns(address) {
+
+        require(IArtifact(artifactAddr_).honorAddr() == honorAddr, 
+            'Artifact does not match HONOR');
+        require(ISTT(honorAddr).balanceOf(artifactAddr_) != 0, 
             'Target artifact has no HONOR');
         artifactToRF[artifactAddr_] = address(new RewardFlow(
             artifactAddr_, gerasAddr_));
-        require(artifactToRF[artifactToRF[artifactAddr_]] == address(0), 
-            'Artifact for RewardFlow exists');
         artifactToRF[artifactToRF[artifactAddr_]] = artifactAddr_;
 
         IRewardFlow(artifactToRF[artifactAddr_]).setArtifact();
@@ -194,31 +193,34 @@ contract RewardFlow is IRewardFlow {
         * this sender, it is removed and replaced with this one. 
         * If the allocation amount is zero, remove completely.
     */
-    function submitAllocation(address targetAddr, uint8 allocAmt) 
+    function submitAllocation(address targetAddr, uint8 amt, address voucher) 
     external override returns (uint queuePosition) {
 
-        require(allocAmt <= MAX_ALLOC, 'Budget Allocation > 256');
-        require(IArtifact(artifactAddr).balanceOf(msg.sender) > 0, 
-            'Sender has not vouched');
+        require(amt <= MAX_ALLOC, 'Budget Allocation > 256');
         require(address(this) != targetAddr, 'No Artifact self-reward allowed');
+
+        if (msg.sender != gerasAddr) { voucher = msg.sender; }
+
+        require(IArtifact(artifactAddr).balanceOf(voucher) > 0, 
+            'Sender has not vouched');
         require(IRewardFlowFactory(rfFactory).getArtiToRF(
             targetAddr) != address(0), 'Target RewardFlow not found');
 
-        if (allocAmt == 0) {
-            positions[msg.sender] = 0;
+        if (amt == 0) {
+            positions[voucher] = 0;
             return 0;
         }
-        if (positions[msg.sender] > 0) {
-            queuePosition = positions[msg.sender];
+        if (positions[voucher] > 0) {
+            queuePosition = positions[voucher];
         }
         else {
             queuePosition = BQueue.getNextPos(bq);
-            BQueue.enqueue(bq, msg.sender);
-            positions[msg.sender] = queuePosition;
+            BQueue.enqueue(bq, voucher);
+            positions[voucher] = queuePosition;
         }
 
-        allocations[msg.sender] = Allocation(targetAddr, allocAmt);
-        emit Allocate(msg.sender, targetAddr, allocAmt);
+        allocations[voucher] = Allocation(targetAddr, amt);
+        emit Allocate(voucher, targetAddr, amt);
     }
 
     /** 

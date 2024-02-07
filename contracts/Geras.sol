@@ -18,9 +18,6 @@ import "./SafeMath.sol";
  * In this way, Geras : RewardFlow :: Honor : Artifact.
  */ 
 contract Geras is IGeras {
-    mapping (address => uint) private _vsaBalances;
-    mapping (address => uint) private _stakedAsset;
-    mapping (address => uint) private _balances;
     address public honorAddr;
     address public rootArtifact;
     address public stakedAssetAddr;
@@ -37,6 +34,10 @@ contract Geras is IGeras {
 
     mapping (address => uint) private _accHonorClaims;
     mapping (address => uint) private _lastUpdatedStake;
+    mapping (address => uint) private _vsaBalances;
+    mapping (address => uint) private _stakedAsset;
+    mapping (address => uint) private _balances;
+    mapping (address => address) private _artifactToRF;
 
 
     constructor(address hnrAddr, address _stakedAssetAddr) {
@@ -81,23 +82,61 @@ contract Geras is IGeras {
     }
 
     /** 
-     *  Wrapper for the RF Payforward function. 
+     *  Wrapper for the RFFactory createRewardFlow function. 
+     */
+    function createRewardFlow(address artifactAddr) external override 
+    returns(address) {
+        require(_artifactToRF[artifactAddr] == address(0), 
+            'RewardFlow for artifact exists');
+        _artifactToRF[artifactAddr] = IRewardFlowFactory(rewardFlowFactory).
+        createRewardFlow(honorAddr, artifactAddr, address(this));
+        require(_artifactToRF[_artifactToRF[artifactAddr]] == address(0), 
+            'Artifact for RewardFlow exists');
+        _artifactToRF[_artifactToRF[artifactAddr]] = artifactAddr;
+
+        return _artifactToRF[artifactAddr];
+    }
+
+    /** 
+     *  Wrapper for the RF payForward function. 
      */
     function payForward(address artifactToPay) external override returns (
         address target, uint amtToReceive) {
-        (target, amtToReceive) = IRewardFlow(IRewardFlowFactory(
-            rewardFlowFactory).getArtiToRF(artifactToPay)).payForward();
+        require(_artifactToRF[artifactToPay] != address(0), 
+            'RewardFlow does not exist');
+        (target, amtToReceive) = IRewardFlow(
+            _artifactToRF[artifactToPay]).payForward();
     }
     
     /** 
-     *  Wrapper for the RF SubmitAllocation function. 
+     *  Wrapper for the RF submitAllocation function. 
      */
-    function submitAllocation(address artifactToAlloc, address targetAddr, 
+    function submitAllocation(address artToAlloc, address targetAddr, 
         uint8 allocAmt) external override returns (uint queuePosition) {
-        queuePosition = IRewardFlow(IRewardFlowFactory(
-            rewardFlowFactory).getArtiToRF(artifactToAlloc)).submitAllocation(
-                targetAddr, allocAmt);
+        require((_artifactToRF[artToAlloc] != address(0)) && (
+            _artifactToRF[targetAddr] != address(0)), 'RewardFlow not set');
+        queuePosition = IRewardFlow(_artifactToRF[artToAlloc]).submitAllocation(
+                _artifactToRF[targetAddr], allocAmt, msg.sender);
     }
+
+    /** 
+     *  Wrapper for the RF redeemReward function. 
+     */
+    function redeemReward(address artifactToRedeem, address claimer, 
+        uint redeemAmt) external returns (uint) {
+        require(_artifactToRF[artifactToRedeem] != address(0), 
+            'RewardFlow does not exist');
+        return IRewardFlow(_artifactToRF[artifactToRedeem]).redeemReward(
+            claimer, redeemAmt);
+    }
+
+    // function donateAsset(address stakeTarget) external {
+    //     require(stakeTarget == rootArtifact, 'Only donate to root artifact');
+    //     uint totalShares = IWStETH(stakedAssetAddr).balanceOf(address(this));
+    //     require(totalShares > stakedShares, 'No asset transferred to donate'); 
+    //     stakedShares = totalShares;
+    // }
+
 
     /**
      *  The wrapped asset will be passed into this contract in terms of shares.
@@ -124,6 +163,19 @@ contract Geras is IGeras {
 
         emit Stake(msg.sender, stakeTarget, amt);
         return _stakedAsset[stakeTarget];
+    }
+
+    function unstakeAsset(address stakeTarget, uint amount) public {
+        require(stakeTarget == rootArtifact);
+        require(amount <= _balances[msg.sender]);
+        require(amount <= _stakedAsset[stakeTarget]);
+        updateHonorClaims(msg.sender);
+
+        _stakedAsset[stakeTarget] -= amount;
+        _burn(msg.sender, amount);
+        stakedShares -= amount;
+        IWStETH(stakedAssetAddr).transfer(msg.sender, amount);
+        emit Unstake(msg.sender, stakeTarget, amount);
     }
 
     function getStakedAsset(address stakeTarget) external override view 
@@ -155,17 +207,6 @@ contract Geras is IGeras {
         _lastUpdatedStake[account] = block.timestamp;
     }
 
-    function unstakeAsset(address stakeTarget, uint amount) public {
-        require(stakeTarget == rootArtifact);
-        require(amount <= _balances[msg.sender]);
-        require(amount <= _stakedAsset[stakeTarget]);
-        updateHonorClaims(msg.sender);
-
-        _stakedAsset[stakeTarget] -= amount;
-        _burn(msg.sender, amount);
-        IWStETH(stakedAssetAddr).transfer(msg.sender, amount);
-        emit Unstake(msg.sender, stakeTarget, amount);
-    }
 
     function distributeGeras(address rewardFlowAddr) public {
         // For now, only root artifact can generate Geras.
@@ -233,6 +274,7 @@ contract Geras is IGeras {
         require(senderBalance >= amount, "GERAS: vsa tfer exceeds bal");
         _vsaBalances[sender] = senderBalance - amount;
         _vsaBalances[recipient] += amount;
+        emit VSATransfer(sender, recipient, amount);
     }
 
 
@@ -252,7 +294,7 @@ contract Geras is IGeras {
     function _vsaMint(address account, uint256 amount) internal virtual {
         _totalVSASupply += amount;
         _vsaBalances[account] += amount;
-        emit Transfer(address(0), account, amount);
+        emit VSATransfer(address(0), account, amount);
     }
 
     function _vsaBurn(address account, uint256 amount) internal virtual {
@@ -263,7 +305,7 @@ contract Geras is IGeras {
         _vsaBalances[account] = accountBalance - amount;
         _totalVSASupply -= amount;
 
-        emit Transfer(account, address(0), amount);
+        emit VSATransfer(account, address(0), amount);
     }
 
     function _mint(address account, uint256 amount) internal virtual {

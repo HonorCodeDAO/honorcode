@@ -24,7 +24,7 @@ contract RewardFlowHandler is Test {
         vm.startPrank(owner);        
         if (IRewardFlow(rfs[flowIdx % rfs.length]).availableReward() == 0) {
             IRewardFlow(rfs[0]).submitAllocation(
-                rfs[flowIdx % rfs.length], uint8(128));
+                rfs[flowIdx % rfs.length], uint8(128), owner);
         }
         vm.warp(block.timestamp + duration);
         IRewardFlow(rfs[flowIdx % rfs.length]).payForward();
@@ -37,7 +37,7 @@ contract RewardFlowHandler is Test {
         }
         vm.startPrank(owner);
         IRewardFlow(rfs[allocatorIdx % rfs.length]).submitAllocation(
-            rfs[granteeIdx % rfs.length], uint8(amt % 256));
+            rfs[granteeIdx % rfs.length], uint8(amt % 256), owner);
         vm.stopPrank();
     }
 

@@ -41,7 +41,7 @@ contract InvariantHonorTest is Test {
 
         HonorFactory hfact = new HonorFactory();
         hnr = Honor(hfact.createHonor(address(afact), 'TEST_HONOR'));
-            
+
         root = Artifact(hnr.rootArtifact());
         geras = new Geras(address(hnr), address(mockERC));
         hnr.setGeras(address(geras));
@@ -54,13 +54,13 @@ contract InvariantHonorTest is Test {
         address newA = hnr.proposeArtifact(address(root), address(3), 'A', true);
         address newB = hnr.proposeArtifact(address(root), address(7), 'B', true);
 
-        rfact = new RewardFlowFactory(address(hnr));
+        rfact = new RewardFlowFactory();
         hnr.setRewardFlowFactory(address(rfact));
         geras.setRewardFlowFactory(address(rfact));
-        rootRF = RewardFlow(rfact.createRewardFlow(address(root), address(geras)));
+        rootRF = RewardFlow(rfact.createRewardFlow(address(hnr), address(root), address(geras)));
 
-        address rootRFA = address(RewardFlow(rfact.createRewardFlow(newA, address(geras))));
-        address rootRFB = address(RewardFlow(rfact.createRewardFlow(newB, address(geras))));
+        address rootRFA = address(RewardFlow(rfact.createRewardFlow(address(hnr), newA, address(geras))));
+        address rootRFB = address(RewardFlow(rfact.createRewardFlow(address(hnr), newB, address(geras))));
 
         address[3] memory artifacts = [address(root), newA, newB];
         address[3] memory flows = [address(rootRF), rootRFA, rootRFB];

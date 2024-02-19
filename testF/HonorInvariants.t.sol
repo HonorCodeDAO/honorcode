@@ -65,9 +65,12 @@ contract InvariantHonorTest is Test {
         address[3] memory artifacts = [address(root), newA, newB];
         address[3] memory flows = [address(rootRF), rootRFA, rootRFB];
 
-        vm.warp(block.timestamp + 10000);
+        vm.warp(block.timestamp + 1000);
         geras.distributeGeras(address(rootRF));
 
+        uint stakeRate = geras.stakedToVsaRate();
+
+        uint totalClaimsERC = geras.totalVSASupply() + geras.totalSupply();
         hnrH = new HonorHandler(hnr, artifacts);
         targetContract(address(hnrH));
         rfH = new RewardFlowHandler(flows, address(geras), hnr.owner());
@@ -87,6 +90,20 @@ contract InvariantHonorTest is Test {
         }
         assertEq(gBalance, geras.totalVSASupply(), 'RF geras imbalance');
         assertEq(rfBalance, geras.totalVSASupply(), 'RF totalgeras imbalance');
+
+        if (geras.getLastUpdated(address(geras)) != block.timestamp) {
+            geras.distributeGeras(rfH.rfs(0));
+        }
+
+        uint stakeRate = geras.stakedToVsaRate();
+        assertGe((mockERC.balanceOf(address(geras)) * stakeRate) >> 60, mockERC.balanceOf(address(geras)), 'stake rate');
+        assertEq(geras.totalVSASupply(), // / stakeRate , 
+            (((mockERC.balanceOf(address(geras)) * stakeRate) >> 60)) - mockERC.balanceOf(address(geras)), 'vsa supply');
+
+        uint totalClaimsERC = geras.totalVSASupply() + geras.totalSupply();
+
+        assertEq((mockERC.balanceOf(address(geras)) * stakeRate) >> 60, 
+            totalClaimsERC, 'staking claims imbalance');
     }
 
     function invariant_HonorBalance() public {

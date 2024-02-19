@@ -34,7 +34,7 @@ contract MockCoin is IWStETH {
     }
 
     function rebase() public {
-        total_supply += total_supply * (block.timestamp - lastUpdated) / 10e12;
+        total_supply += total_supply * ((block.timestamp - lastUpdated) >> 5) / 31536000;
         lastUpdated = block.timestamp;
     }
 

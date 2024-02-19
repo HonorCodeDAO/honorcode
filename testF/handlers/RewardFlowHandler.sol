@@ -44,7 +44,7 @@ contract RewardFlowHandler is Test {
     function redeemReward(uint redeemerIdx, uint amt, uint duration) external {
         duration = uint32(bound(duration, 1000, 1000000));
         vm.startPrank(owner);
-        amt = uint32(bound(amt, 1000, IArtifact(IRewardFlow(
+        amt = (bound(amt, 1000, IArtifact(IRewardFlow(
             rfs[redeemerIdx % rfs.length]).artifactAddr()).accRewardClaim(owner)));
         vm.warp(block.timestamp + duration);
         IRewardFlow(rfs[redeemerIdx % rfs.length]).redeemReward(owner, amt);
@@ -60,7 +60,7 @@ contract RewardFlowHandler is Test {
     }
 
     function distributeReward(uint amt, uint rate, uint duration) external {
-        amt = uint32(bound(amt, 1000, 0.01 ether));
+        amt = bound(amt, 1000, 0.01 ether);
         duration = uint32(bound(duration, 1000, 1000000));
         rate = uint32(bound(rate, 1, 1024));
         vm.warp(block.timestamp + duration);

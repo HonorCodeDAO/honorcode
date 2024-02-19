@@ -22,12 +22,15 @@ contract Geras is IGeras {
     address public rootArtifact;
     address public stakedAssetAddr;
     address public rewardFlowFactory;
-    uint public stakedShares;
+    uint public totalShares;
     uint public redeemableReward;
     uint public claimableReward;
 
     // Percentage of 1024
     uint public claimableConversionRate = 1024;
+    // This will decrease at a rate 32 / 1024 per year.
+    uint public stakedToVsaRate = 2 ** 60;
+    uint public lastDistRate = 2 ** 60;
     uint private _totalSupply;
     uint private _totalVSASupply;
     uint32 private _lastUpdated;
@@ -45,17 +48,26 @@ contract Geras is IGeras {
         honorAddr = hnrAddr;
         stakedAssetAddr = _stakedAssetAddr;
         _lastUpdated = uint32(block.timestamp);
+        _lastUpdatedStake[address(this)] = block.timestamp;
     }
 
     function updateHonorClaims(address account) private {
         require(_totalSupply >= _balances[account], 
             'total staked < acct bal');
-        _accHonorClaims[address(this)] += _totalSupply * (
-            block.timestamp - _lastUpdatedStake[address(this)]);
+        if (block.timestamp > _lastUpdatedStake[address(this)]) {
+            stakedToVsaRate += (block.timestamp - _lastUpdatedStake[address(this)]) << 30;
+            _accHonorClaims[address(this)] += _totalSupply * (
+                block.timestamp - _lastUpdatedStake[address(this)]);
+            _lastUpdatedStake[address(this)] = block.timestamp;
+        }
+        if (account == address(this)) { return; }
+        if ((_lastUpdatedStake[account] == 0) || (_balances[account] == 0)) {
+            _lastUpdatedStake[account] = block.timestamp;
+            return;
+        }
         _accHonorClaims[account] += _balances[account] * (
             block.timestamp - _lastUpdatedStake[msg.sender]);
         _lastUpdatedStake[account] = block.timestamp;
-        _lastUpdatedStake[address(this)] = block.timestamp;
     }
 
     function vsaBalanceOf(address addr) public view returns(uint) {
@@ -76,9 +88,9 @@ contract Geras is IGeras {
     /** 
      *  Wrapper for the RFFactory getArtiToRF function. 
      */
-    function getArtifactToRewardFlow(address artifactOrRF) external override 
+    function getArtifactToRewardFlow(address artOrRF) external override view
     returns (address) {
-        return IRewardFlowFactory(rewardFlowFactory).getArtiToRF(artifactOrRF);
+        return IRewardFlowFactory(rewardFlowFactory).getArtiToRF(artOrRF);
     }
 
     /** 
@@ -130,12 +142,15 @@ contract Geras is IGeras {
             claimer, redeemAmt);
     }
 
-    // function donateAsset(address stakeTarget) external {
-    //     require(stakeTarget == rootArtifact, 'Only donate to root artifact');
-    //     uint totalShares = IWStETH(stakedAssetAddr).balanceOf(address(this));
-    //     require(totalShares > stakedShares, 'No asset transferred to donate'); 
-    //     stakedShares = totalShares;
-    // }
+    // We may want to allow cash infusions without claims, and calling this 
+    // function prevents others from claiming a new staking position.
+    function donateAsset(address stakeTarget) external {
+        require(stakeTarget == rootArtifact, 'Only donate to root artifact');
+        require(totalShares < IWStETH(stakedAssetAddr).balanceOf(address(this)), 
+            'No asset transferred to donate'); 
+        totalShares = IWStETH(stakedAssetAddr).balanceOf(address(this));
+        distributeGeras(stakeTarget);
+    }
 
 
     /**
@@ -145,21 +160,28 @@ contract Geras is IGeras {
      *  fewer shares, but the same amount of stETH, as intended.
      *  We need to keep track of both, because otherwise we won't know how much
      *  is transferred as opposed to accrued through rebasing.
+     *  In addition, we have new Geras entering the system at a rate = 32/1024
+     *  per year, which then becomes claimable VSA by vouchers.
+     *  Thus, stakers will need to have their shares debased at this same rate 
+     *  so there is enough to be claimed by everybody. 
      */
     function stakeAsset(address stakeTarget) external override returns (uint) {
         require(stakeTarget == rootArtifact, 'Only stake with root artifact');
-        uint totalShares = IWStETH(stakedAssetAddr).balanceOf(address(this));
+        require(IWStETH(stakedAssetAddr).balanceOf(address(this)) > totalShares,
+            'No asset transferred to stake'); 
+        // uint amt = IWStETH(stakedAssetAddr).getStETHByWstETH(
+        //     IWStETH(stakedAssetAddr).balanceOf(address(this)) - totalShares);
 
-        require(totalShares > stakedShares, 'No asset transferred to stake'); 
-        uint amt = IWStETH(stakedAssetAddr).getStETHByWstETH(
-            totalShares - stakedShares);
+        updateHonorClaims(msg.sender);
+        uint amt = ((IWStETH(stakedAssetAddr).balanceOf(
+            address(this)) - totalShares) * stakedToVsaRate) >> 60;
+
         _stakedAsset[stakeTarget] += amt;
         
-        updateHonorClaims(msg.sender);
         // _balances[msg.sender] += amt;
         // _totalSupply = _totalSupply + amt;
         _mint(msg.sender, amt);
-        stakedShares = totalShares;
+        totalShares += amt;
 
         emit Stake(msg.sender, stakeTarget, amt);
         return _stakedAsset[stakeTarget];
@@ -173,8 +195,12 @@ contract Geras is IGeras {
 
         _stakedAsset[stakeTarget] -= amount;
         _burn(msg.sender, amount);
-        stakedShares -= amount;
-        IWStETH(stakedAssetAddr).transfer(msg.sender, amount);
+        totalShares -= amount;
+        // IWStETH(stakedAssetAddr).transfer(msg.sender, 
+        //     IWStETH(stakedAssetAddr).getWstETHByStETH(amount));
+
+        IWStETH(stakedAssetAddr).transfer(msg.sender, 
+            (amount << 60) / stakedToVsaRate);
         emit Unstake(msg.sender, stakeTarget, amount);
     }
 
@@ -207,18 +233,24 @@ contract Geras is IGeras {
         _lastUpdatedStake[account] = block.timestamp;
     }
 
-
     function distributeGeras(address rewardFlowAddr) public {
         // For now, only root artifact can generate Geras.
         require(IRewardFlow(rewardFlowAddr).artifactAddr() == rootArtifact, 
             'Only stake with root artifact');
-        uint32 timeElapsed = uint32(block.timestamp) - _lastUpdated;
+
+        updateHonorClaims(address(this));
+        if (((_stakedAsset[rootArtifact] * stakedToVsaRate) >> 60) <= (
+            _totalSupply + _totalVSASupply)) {
+                return;
+        }
 
         // Assume new Geras accumulates at a rate of ~3% per year per unit VSA.
-        uint newGerasPerYear = _stakedAsset[rootArtifact] * 32 / 1024;
-        _lastUpdated = uint32(block.timestamp);
-        _vsaMint(rewardFlowAddr, timeElapsed * newGerasPerYear / 31536000); 
+        // The stakedToVsaRate tells us the target VSA amount, based on current
+        // actual staked asset. This op mints enough new VSA to close the gap. 
+        _vsaMint(rewardFlowAddr, ((_stakedAsset[rootArtifact] * stakedToVsaRate) 
+            >> 60) - (_totalSupply + _totalVSASupply));
         IRewardFlow(rewardFlowAddr).receiveVSR();
+
         // We should probably do this, at least once...
         // IRewardFlow(rewardFlowAddr).payForward();
     }

@@ -1,7 +1,5 @@
 pragma solidity ^0.8.13;
 
-import "./SafeMath.sol";
-
 // This queue is meant to approximate proportional allocation, but instead of 
 // sending to all targets, an amount is propagated in round-robin format, 
 // so that at most one forwarding occurs at a time. We can track an overflow 
@@ -20,19 +18,19 @@ struct BudgetQ {
 
 library BQueue {
 
-    function enqueue(BudgetQ storage bq, address newAddress) public {
+    function enqueue(BudgetQ storage bq, address newAddress) internal {
         bq.last += 1;
         bq.queue[bq.last] = newAddress;
     }
 
-    function dequeue(BudgetQ storage bq) public returns (address next) {
+    function dequeue(BudgetQ storage bq) internal returns (address next) {
         require (bq.first <= bq.last); 
         next = bq.queue[bq.first];
         delete bq.queue[bq.first];
         bq.first += 1;
     }
 
-    function requeue(BudgetQ storage bq) public returns (address next) {
+    function requeue(BudgetQ storage bq) internal returns (address next) {
         require (bq.first <= bq.last, 'Malformed budget queue'); 
         next = bq.queue[bq.first];
         delete bq.queue[bq.first];
@@ -40,25 +38,25 @@ library BQueue {
         enqueue(bq, next);
     }
 
-    function peek(BudgetQ storage bq) public view returns (address firstA) {
+    function peek(BudgetQ storage bq) internal view returns (address firstA) {
         require (bq.first <= bq.last, 'budget queue is empty'); 
         firstA = bq.queue[bq.first];
     }
 
-    function peekLast(BudgetQ storage bq) public view returns (address lastA) {
+    function peekLast(BudgetQ storage bq) internal view returns (address lastA) {
         require (bq.first <= bq.last, 'budget queue is empty'); 
         lastA = bq.queue[bq.last];
     }
 
-    function isEmpty(BudgetQ storage bq) public view returns (bool empty) {
+    function isEmpty(BudgetQ storage bq) internal view returns (bool empty) {
         empty = bq.first == 0 || bq.first > bq.last;
     }
 
-    function getNextPos(BudgetQ storage bq) public view returns (uint nextPos) {
+    function getNextPos(BudgetQ storage bq) internal view returns (uint nextPos) {
         nextPos = bq.last + 1; 
     }
 
-    function incrementFirst(BudgetQ storage bq) public {
+    function incrementFirst(BudgetQ storage bq) internal {
         bq.first += 1; 
     }
 }

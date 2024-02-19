@@ -64,7 +64,9 @@ contract RewardFlow is IRewardFlow {
     // and if their 'budgets' entry is non-existent, assume the allocation is 
     // the full amount.  
     // NOTE: we have disabled the partial allocation procedure for now, to limit
-    // complexity.
+    // complexity. 
+    // However, payments occur according to a round-robin budget queue, and size
+    // of grant depends on Honor holdings in that corresponding artifact. 
     mapping (address => Allocation) allocations;
     mapping (address => uint) positions; 
     // mapping (address => BudgetQ) budgets;
@@ -124,12 +126,14 @@ contract RewardFlow is IRewardFlow {
     // where F is the constant FRACTION_TO_PASS, resulting in exponential decay:
     // (1 - 1/(F H_i/Sum_j(H))) ^ T. 
     // Additionally, we'll have the default allocation keep half to itself,
-    // to prevent a repetitive drainage attack.
+    // to lessen a repetitive drainage attack.
+    // This function activates a recursive call, and depth depends on "random"
+    // transitions, with 1/3 chance of paying forward the target.
     function payForward() external override returns (
         address target, uint rewardAmt) {
         receiveVSR();
         // Let's prevent unnecessary loops / propogation 
-        if ((availableReward == 0) || _lastUpdated > block.timestamp) { 
+        if ((availableReward == 0) || _lastUpdated >= block.timestamp) { 
             return (address(this), 0);
         }
         address rewarderAddr = BQueue.peek(bq);
@@ -206,6 +210,8 @@ contract RewardFlow is IRewardFlow {
         require(IRewardFlowFactory(rfFactory).getArtiToRF(
             targetAddr) != address(0), 'Target RewardFlow not found');
 
+        this.payForward();
+
         if (amt == 0) {
             positions[voucher] = 0;
             return 0;
@@ -220,6 +226,7 @@ contract RewardFlow is IRewardFlow {
         }
 
         allocations[voucher] = Allocation(targetAddr, amt);
+
         emit Allocate(voucher, targetAddr, amt);
     }
 

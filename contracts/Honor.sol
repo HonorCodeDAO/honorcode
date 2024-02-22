@@ -66,27 +66,27 @@ contract Honor is ISTT {
         gerasAddr = gerasAddress;
     }
 
-    function balanceOf(address addr) public view returns(uint) {
-        return _balances[addr]; 
+    function balanceOf(address artifactAddr) public view returns(uint) {
+        return _balances[artifactAddr]; 
     }
 
-    function balanceOfArtifact(address addr, address account) 
-    public view returns(uint) {
-        return IArtifact(addr).balanceOf(account);
+    function lastUpdated() public view returns(uint) {
+        return _lastUpdated; 
     }
 
-    function internalHonorBalanceOfArtifact(address addr) 
+    function balanceOfArtifact(address artifactAddr, address account) 
     public view returns(uint) {
-        return IArtifact(addr).honorWithin();
+        return IArtifact(artifactAddr).balanceOf(account);
     }
     
-    function getArtifactBuilder(address addr) public view returns(address) {
-        return IArtifact(addr).builder();
+    function getArtifactBuilder(address artifactAddr) 
+    public view returns(address) {
+        return IArtifact(artifactAddr).builder();
     }
 
-    function getArtifactAccumulatedHonorHours(address addr) 
+    function getArtifactAccumulatedHonorHours(address artifactAddr) 
     public view returns(uint) {
-        return IArtifact(addr).accHonorHours();
+        return IArtifact(artifactAddr).accHonorHours();
     }
 
     function getArtifactAtLoc(string memory loc) external override view returns(address) {
@@ -166,7 +166,7 @@ contract Honor is ISTT {
      *  equals staked asset is 2^70 (~1000 ETH). Which means we multiply the 
      *  square root by 2^35.
     */
-    function mintToStakers() public returns(uint farmedHonor) {
+    function mintToStakers() external override returns(uint farmedHonor) {
         uint stakeAmt = SafeMath.floorSqrt(
             IGeras(gerasAddr).totalSupply()) << 35;
         // Will be minted at an annual rate.
@@ -190,7 +190,6 @@ contract Honor is ISTT {
     function stakingMintPool() external override view returns (uint) {
         return _stakingMintPool;
     }
-
 
     function _mint(address account, uint256 amount) internal virtual {
         _totalSupply += amount;

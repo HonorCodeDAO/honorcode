@@ -43,7 +43,7 @@ contract InvariantHonorTest is Test {
         hnr = Honor(hfact.createHonor(address(afact), 'TEST_HONOR'));
 
         root = Artifact(hnr.rootArtifact());
-        geras = new Geras(address(hnr), address(mockERC));
+        geras = new Geras(address(hnr), address(mockERC), 'TEST_GERAS');
         hnr.setGeras(address(geras));
 
         vm.startPrank(staker);
@@ -96,10 +96,11 @@ contract InvariantHonorTest is Test {
         }
 
         uint stakeRate = geras.stakedToVsaRate();
-        assertGe((mockERC.balanceOf(address(geras)) * stakeRate) >> 60, mockERC.balanceOf(address(geras)), 'stake rate');
+        assertGe((mockERC.balanceOf(address(geras)) * stakeRate) >> 60, 
+            mockERC.balanceOf(address(geras)), 'stake rate');
         assertEq(geras.totalVSASupply(), // / stakeRate , 
-            (((mockERC.balanceOf(address(geras)) * stakeRate) >> 60)) - mockERC.balanceOf(address(geras)), 'vsa supply');
-
+            (((mockERC.balanceOf(address(geras)) * stakeRate) >> 60)) - (
+                geras.totalSupply()), 'vsa supply');
         uint totalClaimsERC = geras.totalVSASupply() + geras.totalSupply();
 
         assertEq((mockERC.balanceOf(address(geras)) * stakeRate) >> 60, 

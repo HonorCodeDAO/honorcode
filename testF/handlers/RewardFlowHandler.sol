@@ -19,6 +19,13 @@ contract RewardFlowHandler is Test {
         owner = rootOwner;
     }
 
+    // function transfer(uint amount) external {
+    //     amount = bound(amount, 1000, 1 ether);
+    //     vm.startPrank(owner);
+    //     IGeras(gerasAddr).transfer(gerasAddr, amount);
+    //     vm.stopPrank();
+    // }
+
     function payForward(uint flowIdx, uint duration) external {
         duration = uint32(bound(duration, 1000, 1000000));
         vm.startPrank(owner);        

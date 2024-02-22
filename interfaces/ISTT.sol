@@ -15,6 +15,7 @@ interface ISTT {
     function owner() external view returns(address);
     function rewardFlowFactory() external view returns(address);
     function stakingMintPool() external view returns (uint);
+    function mintToStakers() external returns(uint);
     function proposeArtifact(address _from, address builder, string memory loc, bool should_validate) external returns(address);
     function validateArtifact(address _from, address addr) external returns(bool);
     function vouch(address _from, address _to, uint amount) external returns(uint);

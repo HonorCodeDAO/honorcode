@@ -29,7 +29,7 @@ contract RewardFlowTest is Test {
         hnr = Honor(hfact.createHonor(address(afact), 'TEST_HONOR'));
 
         root = Artifact(hnr.rootArtifact());
-        geras = new Geras(address(hnr), address(mockERC));
+        geras = new Geras(address(hnr), address(mockERC), 'TEST_GERAS');
         hnr.setGeras(address(geras));
         owner = hnr.owner();
         rfact = new RewardFlowFactory();
@@ -212,11 +212,13 @@ contract RewardFlowTest is Test {
         assertEq(mintPool, farmedHonor, 'farmed honor incorrect');
         hnr.mintToStaker();
 
+        emit log_string('artifact balances'); 
         emit log_uint(hnr.balanceOfArtifact(address(root), builder));
         emit log_uint(hnr.balanceOfArtifact(address(newA),  address(808)));
         emit log_uint(Artifact(newA).balanceOf(builder));
 
-        assertEq(hnr.balanceOfArtifact(address(newA), address(808)), expectedBuilderV);
+        assertEq(hnr.balanceOfArtifact(address(newA), address(808)), expectedBuilderV, 
+            'builder vouch incorrect');
 
         uint rootHonor = hnr.balanceOf(address(root));
 
@@ -229,6 +231,46 @@ contract RewardFlowTest is Test {
         geras.unstakeAsset(address(root), stakedAmt);
         assertEq(geras.totalSupply(), 0, 'leftover VSR');
         assertEq(mockERC.balanceOf(builder) + mockERC.balanceOf(address(geras)), 10000 ether, 'missing ERC');
+        assertEq(hnr.stakingMintPool(), 0, 'mint pool not emptied');
+
+        vm.startPrank(builder);
+
+        vm.warp(block.timestamp + duration);
+        mockERC.transfer(address(geras), mockAmt);
+        stakedAmt = geras.stakeAsset(address(root));
+
+        geras.transfer(address(80808), stakedAmt / 4);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 2 * duration);
+
+        emit log_uint(hnr.lastUpdated());
+        farmedHonor = (SafeMath.floorSqrt(geras.totalSupply()) << 35);
+        farmedHonor = 2 * duration * farmedHonor / 31536000;
+
+        // emit log_uint(geras.getHonorClaim(builder));
+        // emit log_uint(geras.getHonorClaim(address(80808)));
+
+        hnr.mintToStakers();
+        mintPool = hnr.stakingMintPool();
+        assertEq(mintPool, farmedHonor, '2nd farmed honor incorrect');
+
+        uint rootBal = hnr.balanceOf(address(root));
+        uint vouchAmt = (SafeMath.floorSqrt(rootBal + farmedHonor / 2) * root.totalSupply()) / ( 
+                SafeMath.floorSqrt(rootBal)) - root.totalSupply();
+
+        vm.prank(address(80808));
+        hnr.mintToStaker();
+
+        emit log_string('staking balances'); 
+        emit log_uint(hnr.lastUpdated());
+        emit log_uint(geras.balanceOf(builder));
+        emit log_uint(geras.balanceOf(address(80808)));
+
+        emit log_uint(hnr.balanceOfArtifact(address(root), builder));
+        emit log_uint(hnr.balanceOfArtifact(address(root), address(80808)));
+        // assertEq((hnr.balanceOfArtifact(address(root), address(80808))), 
+        //     vouchAmt, 'geras transfer gives wrong farmed honor');
 
     }
 

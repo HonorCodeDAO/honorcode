@@ -10,16 +10,16 @@ import "../interfaces/ISTT.sol";
 import "../interfaces/IRewardFlow.sol";
 import "../interfaces/IRewardFlowFactory.sol";
 
-
-// The virtual staked asset emits rewards that flow through the Artifact graph. 
-// Each vouch claim has a certain amount of allocation power over the flow
-// through each artifact. 
-// One way to make the computation feasible would be to cap the number of 
-// outbound flow slots, reserving the first for self-flow.
-// However, the solution here is to do asynchronous flows triggered by 
-// contract events, where the flows occur in round-robin fashion.
-// Default is to keep all flow to the corresponding artifact.
-
+/** 
+    * The virtual staked asset emits rewards that flow through the Artifact graph. 
+    * Each vouch claim has a certain amount of allocation power over the flow
+    * through each artifact. 
+    * One way to make the computation feasible would be to cap the number of 
+    * outbound flow slots, reserving the first for self-flow.
+    * However, the solution here is to do asynchronous flows triggered by 
+    * contract events, where the flows occur in round-robin fashion.
+    * Default is to keep all flow to the corresponding artifact.
+*/
 struct Allocation {
     address target;
     uint8 amount;
@@ -27,10 +27,8 @@ struct Allocation {
 
 contract RewardFlowFactory is IRewardFlowFactory {
     mapping (address => address) artifactToRF;
-    // address private honorAddress;
 
     constructor() {
-        // honorAddress = honorAddr;
     }
 
     function getArtiToRF(address artiOrRF) external override view 
@@ -40,11 +38,11 @@ contract RewardFlowFactory is IRewardFlowFactory {
 
     function createRewardFlow(address honorAddr, address artifactAddr_, 
         address gerasAddr_) external override returns(address) {
-
-        require(IArtifact(artifactAddr_).honorAddr() == honorAddr, 
-            'Artifact does not match HONOR');
         require(ISTT(honorAddr).balanceOf(artifactAddr_) != 0, 
             'Target artifact has no HONOR');
+        require(IArtifact(artifactAddr_).honorAddr() == honorAddr, 
+            'Artifact does not match HONOR');
+
         artifactToRF[artifactAddr_] = address(new RewardFlow(
             artifactAddr_, gerasAddr_));
         artifactToRF[artifactToRF[artifactAddr_]] = artifactAddr_;
@@ -55,18 +53,19 @@ contract RewardFlowFactory is IRewardFlowFactory {
 }
 
 contract RewardFlow is IRewardFlow {
-
-    // Where is everybody voting for these rewards to flow? The aggregate value 
-    // above will be calculated from a sum weighted (by vouch size) of 
-    // individual submitted budgets. 
-    // If not set, will default to status quo. 
-    // We can allow individuals to maintain their own partial allocations,
-    // and if their 'budgets' entry is non-existent, assume the allocation is 
-    // the full amount.  
-    // NOTE: we have disabled the partial allocation procedure for now, to limit
-    // complexity. 
-    // However, payments occur according to a round-robin budget queue, and size
-    // of grant depends on Honor holdings in that corresponding artifact. 
+/** 
+    * Where is everybody voting for these rewards to flow? The aggregate value 
+    * above will be calculated from a sum weighted (by vouch size) of 
+    * individual submitted budgets. 
+    * If not set, will default to status quo. 
+    * We can allow individuals to maintain their own partial allocations,
+    * and if their 'budgets' entry is non-existent, assume the allocation is 
+    * the full amount.  
+    * NOTE: we have disabled the partial allocation procedure for now, to limit
+    * complexity. 
+    * However, payments occur according to a round-robin budget queue, and size
+    * of grant depends on Honor holdings in that corresponding artifact. 
+*/ 
     mapping (address => Allocation) allocations;
     mapping (address => uint) positions; 
     // mapping (address => BudgetQ) budgets;
@@ -121,14 +120,17 @@ contract RewardFlow is IRewardFlow {
         availableReward += amtToReceive;
     }
 
-    // Dequeue the next item, calculate the amount to send, and transfer.
-    // Formula is: (H_i/Sum_j(H) * accumulated / F)
-    // where F is the constant FRACTION_TO_PASS, resulting in exponential decay:
-    // (1 - 1/(F H_i/Sum_j(H))) ^ T. 
-    // Additionally, we'll have the default allocation keep half to itself,
-    // to lessen a repetitive drainage attack.
-    // This function activates a recursive call, and depth depends on "random"
-    // transitions, with 1/3 chance of paying forward the target.
+    /** 
+        * Dequeue the next item, calculate the amount to send, and transfer.
+        * Formula is: (H_i/Sum_j(H) * accumulated / F)
+        * where F is the constant FRACTION_TO_PASS, giving exponential decay:
+        * (1 - 1/(F H_i/Sum_j(H))) ^ T. 
+        * Additionally, we'll have the default allocation keep half to itself,
+        * to lessen a repetitive drainage attack.
+        * This function activates a recursive call, depth depends on "random"
+        * transitions, with 1/3 chance of paying forward the target.
+        * For optimal process, recommended to 1st distribute Geras if root RF. 
+    */
     function payForward() external override returns (
         address target, uint rewardAmt) {
         receiveVSR();
@@ -165,12 +167,10 @@ contract RewardFlow is IRewardFlow {
         rewardAmt = amtToMove * alloc / MAX_ALLOC;
         BQueue.requeue(bq);
 
-        if (rewardAmt <= 0) {
-            return (target, 0);
-        }
+        if (rewardAmt <= 0) { return (target, 0); }
 
         if (target != address(this)) {
-            IGeras(gerasAddr).vsaTransfer(address(this), target, rewardAmt);
+            IGeras(gerasAddr).vsaTransfer(target, rewardAmt);
             totalGeras -= rewardAmt;
         }
         availableReward -= amtToMove;
@@ -184,8 +184,16 @@ contract RewardFlow is IRewardFlow {
 
     }
 
-    function nextAllocator() external override view returns (address) {
+    function nextAllocator() external view returns (address) {
         return BQueue.peek(bq);
+    }
+
+    function nextAllocatedTarget() external view returns (address) {
+        return allocations[BQueue.peek(bq)].target;
+    }
+
+    function nextAllocatedAmount() external view returns (uint) {
+        return allocations[BQueue.peek(bq)].amount;
     }
 
     /** 

@@ -59,13 +59,6 @@ interface IERC20 {
      */
     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
 
-    // We require the below functions in order to incorporate staking assets.
-    function getStETHByWstETH(uint256 _wstETHAmount) external view returns (uint256);
-
-    function getWstETHByStETH(uint256 _stETHAmount) external view returns (uint256);
-
-    function stEthPerToken() external view returns (uint256);
-
     /**
      * @dev Emitted when `value` tokens are moved from one account (`from`) to
      * another (`to`).

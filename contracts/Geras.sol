@@ -1,7 +1,7 @@
 pragma solidity ^0.8.13;
 
 import "../interfaces/IArtifact.sol";
-import "../interfaces/IWStETH.sol";
+import "../interfaces/IERC20.sol";
 import "../interfaces/IGeras.sol";
 import "../interfaces/IRewardFlow.sol";
 import "../interfaces/IRewardFlowFactory.sol";
@@ -17,6 +17,19 @@ import "./SafeMath.sol";
  * RF-related functions, allowing us to use artifact addresses instead of RFs.
  * In this way, Geras : RewardFlow :: Honor : Artifact.
  */ 
+
+contract GerasFactory {
+    constructor() {
+    }
+
+    function createGeras(address hnrAddr, address stakedAssetAddr,
+        string memory name) public returns (address) {
+        return address(new Geras(hnrAddr, stakedAssetAddr, name));
+    }
+
+}
+
+
 contract Geras is IGeras {
     address public honorAddr;
     address public rootArtifact;
@@ -31,6 +44,8 @@ contract Geras is IGeras {
     // This will decrease at a rate 32 / 1024 per year.
     uint public stakedToVsaRate = 2 ** 60;
     uint public lastDistRate = 2 ** 60;
+    string public name; 
+
     uint private _totalSupply;
     uint private _totalVSASupply;
     uint32 private _lastUpdated;
@@ -39,14 +54,15 @@ contract Geras is IGeras {
     mapping (address => uint) private _lastUpdatedStake;
     mapping (address => uint) private _vsaBalances;
     mapping (address => uint) private _stakedAsset;
-    mapping (address => uint) private _balances;
     mapping (address => address) private _artifactToRF;
+    mapping (address => uint) private _balances;
+    mapping (address account => mapping(address spender => uint256)) private _allowances;
 
-
-    constructor(address hnrAddr, address _stakedAssetAddr) {
+    constructor(address hnrAddr, address _stakedAssetAdr, string memory _name) {
         rootArtifact = ISTT(hnrAddr).rootArtifact();
         honorAddr = hnrAddr;
-        stakedAssetAddr = _stakedAssetAddr;
+        name = _name;
+        stakedAssetAddr = _stakedAssetAdr;
         _lastUpdated = uint32(block.timestamp);
         _lastUpdatedStake[address(this)] = block.timestamp;
     }
@@ -144,12 +160,12 @@ contract Geras is IGeras {
 
     // We may want to allow cash infusions without claims, and calling this 
     // function prevents others from claiming a new staking position.
-    function donateAsset(address stakeTarget) external {
-        require(stakeTarget == rootArtifact, 'Only donate to root artifact');
-        require(totalShares < IWStETH(stakedAssetAddr).balanceOf(address(this)), 
+    function donateAsset(address donateTarget) external {
+        require(donateTarget == rootArtifact, 'Only donate to root artifact');
+        require(totalShares < IERC20(stakedAssetAddr).balanceOf(address(this)), 
             'No asset transferred to donate'); 
-        totalShares = IWStETH(stakedAssetAddr).balanceOf(address(this));
-        distributeGeras(stakeTarget);
+        totalShares = IERC20(stakedAssetAddr).balanceOf(address(this));
+        distributeGeras(donateTarget);
     }
 
 
@@ -167,13 +183,12 @@ contract Geras is IGeras {
      */
     function stakeAsset(address stakeTarget) external override returns (uint) {
         require(stakeTarget == rootArtifact, 'Only stake with root artifact');
-        require(IWStETH(stakedAssetAddr).balanceOf(address(this)) > totalShares,
-            'No asset transferred to stake'); 
-        // uint amt = IWStETH(stakedAssetAddr).getStETHByWstETH(
-        //     IWStETH(stakedAssetAddr).balanceOf(address(this)) - totalShares);
+        require(IERC20(stakedAssetAddr).balanceOf(address(this)) > totalShares,
+            'GERAS: No asset transferred to stake'); 
 
         updateHonorClaims(msg.sender);
-        uint amt = ((IWStETH(stakedAssetAddr).balanceOf(
+        ISTT(honorAddr).mintToStakers();
+        uint amt = ((IERC20(stakedAssetAddr).balanceOf(
             address(this)) - totalShares) * stakedToVsaRate) >> 60;
 
         _stakedAsset[stakeTarget] += amt;
@@ -184,22 +199,22 @@ contract Geras is IGeras {
         totalShares += amt;
 
         emit Stake(msg.sender, stakeTarget, amt);
-        return _stakedAsset[stakeTarget];
+        return amt;
     }
 
     function unstakeAsset(address stakeTarget, uint amount) public {
-        require(stakeTarget == rootArtifact);
-        require(amount <= _balances[msg.sender]);
-        require(amount <= _stakedAsset[stakeTarget]);
+        require(stakeTarget == rootArtifact, 'Only stake with root artifact');
+        require((amount <= _balances[msg.sender]) && (
+            amount <= _stakedAsset[stakeTarget]),
+            'GERAS: No asset available to unstake');
         updateHonorClaims(msg.sender);
+        ISTT(honorAddr).mintToStakers();
 
         _stakedAsset[stakeTarget] -= amount;
         _burn(msg.sender, amount);
         totalShares -= amount;
-        // IWStETH(stakedAssetAddr).transfer(msg.sender, 
-        //     IWStETH(stakedAssetAddr).getWstETHByStETH(amount));
 
-        IWStETH(stakedAssetAddr).transfer(msg.sender, 
+        IERC20(stakedAssetAddr).transfer(msg.sender, 
             (amount << 60) / stakedToVsaRate);
         emit Unstake(msg.sender, stakeTarget, amount);
     }
@@ -233,6 +248,9 @@ contract Geras is IGeras {
         _lastUpdatedStake[account] = block.timestamp;
     }
 
+    // Assume new Geras accumulates at a rate of ~3% per year per unit VSA.
+    // The stakedToVsaRate tells us the target VSA amount, based on current
+    // actual staked asset. This op mints enough new VSA to close the gap. 
     function distributeGeras(address rewardFlowAddr) public {
         // For now, only root artifact can generate Geras.
         require(IRewardFlow(rewardFlowAddr).artifactAddr() == rootArtifact, 
@@ -244,9 +262,6 @@ contract Geras is IGeras {
                 return;
         }
 
-        // Assume new Geras accumulates at a rate of ~3% per year per unit VSA.
-        // The stakedToVsaRate tells us the target VSA amount, based on current
-        // actual staked asset. This op mints enough new VSA to close the gap. 
         _vsaMint(rewardFlowAddr, ((_stakedAsset[rootArtifact] * stakedToVsaRate) 
             >> 60) - (_totalSupply + _totalVSASupply));
         IRewardFlow(rewardFlowAddr).receiveVSR();
@@ -264,7 +279,7 @@ contract Geras is IGeras {
         // For now, only owner can distribute the staked asset for Geras.
         require(msg.sender == ISTT(honorAddr).owner(), 
             'Only owner can distributeReward');
-        require(claimableReward + amountToDistribute <= IWStETH(
+        require(claimableReward + amountToDistribute <= IERC20(
             stakedAssetAddr).balanceOf(address(this)) - _totalSupply,
             'Geras: payout xceeds VSA rewards'
         );
@@ -284,43 +299,46 @@ contract Geras is IGeras {
     function claimReward(uint gerasClaim, address claimer) public 
     returns (uint vsrClaim) {
         // Burn some of the address's geras claims.
-        require(gerasClaim <= _vsaBalances[msg.sender], 'Geras claim exceeds bal');
+        require(gerasClaim <= _vsaBalances[msg.sender], 
+            'GERAS: claim exceeds bal');
         vsrClaim = gerasClaim * claimableConversionRate / 1024;
 
         require(vsrClaim <= claimableReward, 'Claim reward exceeds claimable');
-        require(vsrClaim <= IWStETH(stakedAssetAddr).balanceOf(address(this)), 
-            'Insufficient VSA to claim reward');
+        require(vsrClaim <= IERC20(stakedAssetAddr).balanceOf(address(this)), 
+            'GERAS: Insuff. VSA to claim reward');
 
         claimableReward -= vsrClaim;
         _vsaBurn(msg.sender, gerasClaim);
-        IWStETH(stakedAssetAddr).transfer(claimer, vsrClaim);
+        IERC20(stakedAssetAddr).transfer(claimer, vsrClaim);
     }
 
-    function vsaTransfer(address sender, address recipient, uint256 amount) 
-    public virtual {
-        require(IArtifact(IRewardFlow(sender).artifactAddr()).isValidated() && (
+    function vsaTransfer(address recipient, uint256 amount) 
+    public virtual returns (bool) {
+        require(IArtifact(IRewardFlow(msg.sender).artifactAddr()).isValidated() && (
             IArtifact(IRewardFlow(recipient).artifactAddr()).isValidated()), 
-            'Both sender and receiver require validation');
+            'GERAS: sender/receiver require validation');
 
-        uint256 senderBalance = _vsaBalances[sender];
+        uint256 senderBalance = _vsaBalances[msg.sender];
         require(senderBalance >= amount, "GERAS: vsa tfer exceeds bal");
-        _vsaBalances[sender] = senderBalance - amount;
+        _vsaBalances[msg.sender] = senderBalance - amount;
         _vsaBalances[recipient] += amount;
-        emit VSATransfer(sender, recipient, amount);
+        emit VSATransfer(msg.sender, recipient, amount);
+        return (true);
     }
 
 
-    function transfer(address sender, address recipient, uint256 amount) 
-    public virtual {
-        require(sender != address(0), "GERAS: transfer from the zero address");
+    function transfer(address recipient, uint256 amount) 
+    public virtual returns (bool) {
         require(recipient != address(0), "GERAS: transfer to the zero address");
+        require(_balances[msg.sender] >= amount, "GERAS: tfer exceeds bal");
+        updateHonorClaims(msg.sender);
+        updateHonorClaims(recipient);
 
-        uint256 senderBalance = _balances[sender];
-        require(senderBalance >= amount, "GERAS: tfer exceeds bal");
-        _balances[sender] = senderBalance - amount;
+        _balances[msg.sender] = _balances[msg.sender] - amount;
         _balances[recipient] += amount;
 
-        emit Transfer(sender, recipient, amount);
+        emit Transfer(msg.sender, recipient, amount);
+        return (true);
     }
 
     function _vsaMint(address account, uint256 amount) internal virtual {
@@ -364,5 +382,27 @@ contract Geras is IGeras {
     function totalVSASupply() external override view returns (uint256) {
         return _totalVSASupply;
     }
-    
+
+    // These are placeholder functions to match ERC20.
+    function transferFrom(address sender, address recipient, uint256 amount) public override virtual returns (bool) {
+        return false;
+    }
+
+    function allowance(address owner, address spender) external override view returns (uint256) {
+        return _allowances[owner][spender];
+    }
+
+    function approve(address spender, uint256 amount) external override returns (bool) {
+        _approve(msg.sender, spender, amount, true);
+        return true;
+    }
+
+    function _approve(address owner, address spender, uint256 value, bool emitEvent) internal virtual {
+        require((owner != address(0)) || (spender == address(0)), 
+            "GERAS: Approval for 0 address");
+        _allowances[owner][spender] = value;
+        if (emitEvent) {
+            emit Approval(owner, spender, value);
+        }
+    }
 }

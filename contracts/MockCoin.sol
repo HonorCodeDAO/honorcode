@@ -2,13 +2,13 @@
 // Tells the Solidity compiler to compile only from v0.8.13 to v0.9.0
 pragma solidity ^0.8.13;
 
-import "../interfaces/IWStETH.sol";
+import "../interfaces/IERC20.sol";
 
 // This coin-like contract is meant to test the reward flow aspects of the 
 // overarching project. It will be rebasing over time, to emulate a yield
 // bearing asset.
 
-contract MockCoin is IWStETH {
+contract MockCoin is IERC20 {
     mapping (address => uint) private _balances;
     uint public total_supply = 10000e18;
     uint constant public TOTAL_PERCENT = 10000e18; 
@@ -55,15 +55,15 @@ contract MockCoin is IWStETH {
         return true;
     }
 
-    function getStETHByWstETH(uint256 _wstETHAmount) external override view returns (uint256) {
+    function getStETHByWstETH(uint256 _wstETHAmount) external view returns (uint256) {
         return _wstETHAmount * total_supply / TOTAL_PERCENT;
     }
 
-    function getWstETHByStETH(uint256 _stETHAmount) external override view returns (uint256) {
+    function getWstETHByStETH(uint256 _stETHAmount) external view returns (uint256) {
         return _stETHAmount * TOTAL_PERCENT / total_supply;
     }
 
-    function stEthPerToken() external override view returns (uint256) {
+    function stEthPerToken() external view returns (uint256) {
         return (1 ether) * total_supply / TOTAL_PERCENT;
     }
 

@@ -1,11 +1,13 @@
 pragma solidity ^0.8.13;
 
-interface IGeras {
+import "../interfaces/IERC20.sol";
+
+interface IGeras is IERC20 {
 
     function balanceOf(address addr) external view returns(uint);
     function vsaBalanceOf(address addr) external view returns(uint);
-    function transfer(address sender, address recipient, uint256 amount) external;
-    function vsaTransfer(address sender, address recipient, uint256 amount) external;
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function vsaTransfer(address recipient, uint256 amount) external returns (bool);
     function totalSupply() external view returns (uint);
     function totalVSASupply() external view returns(uint);
     function stakeAsset(address stakeTarget) external returns (uint);
@@ -23,7 +25,6 @@ interface IGeras {
     function claimReward(uint gerasClaim, address claimer) external returns (uint);
 
     event VSATransfer(address indexed from, address indexed to, uint256 value);
-    event Transfer(address indexed from, address indexed to, uint256 value);
     event Stake(address indexed from, address indexed to, uint256 value);
     event Unstake(address indexed from, address indexed to, uint256 value);
 

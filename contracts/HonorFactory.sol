@@ -1,10 +1,11 @@
+// SPDX-License-Identifier: GNU GPLv3
 pragma solidity ^0.8.13;
 
 import "./Honor.sol";
 
 contract HonorFactory {
     address private owner;
-    mapping (address => address) private honorRegistry;
+    mapping (string => address) private honorRegistry;
 
     constructor() {
         owner = msg.sender;
@@ -13,15 +14,13 @@ contract HonorFactory {
     function createHonor(
         address artifactoryAddress, 
         string memory name) 
-    public returns(address) {
-
-        honorRegistry[artifactoryAddress] = address(
-            new Honor(artifactoryAddress, name, msg.sender));
-        honorRegistry[honorRegistry[artifactoryAddress]] = artifactoryAddress;
-        return honorRegistry[artifactoryAddress];
+    public returns(address honorAddress) {
+        require(honorRegistry[name] == address(0), 'HonorFactory: Name taken');
+        honorAddress = address(new Honor(artifactoryAddress, name, msg.sender));
+        honorRegistry[name] = honorAddress;
     }
 
-    function getHonorArtiFactory(address addr) external view returns(address) {
-        return honorRegistry[addr];
+    function getHonorAddress(string memory name) external view returns(address){
+        return honorRegistry[name];
     }
 }

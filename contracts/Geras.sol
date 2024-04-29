@@ -1,7 +1,7 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
 import "../interfaces/IArtifact.sol";
-import "../interfaces/IERC20.sol";
 import "../interfaces/IGeras.sol";
 import "../interfaces/IRewardFlow.sol";
 import "../interfaces/IRewardFlowFactory.sol";
@@ -56,7 +56,7 @@ contract Geras is IGeras {
     mapping (address => uint) private _stakedAsset;
     mapping (address => address) private _artifactToRF;
     mapping (address => uint) private _balances;
-    mapping (address account => mapping(address spender => uint256)) private _allowances;
+    mapping (address => mapping(address => uint256)) private _allowances;
 
     constructor(address hnrAddr, address _stakedAssetAdr, string memory _name) {
         rootArtifact = ISTT(hnrAddr).rootArtifact();

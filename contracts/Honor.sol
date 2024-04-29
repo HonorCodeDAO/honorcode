@@ -1,8 +1,8 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
 import "../interfaces/IArtifactory.sol";
 import "../interfaces/IArtifact.sol";
-import "../interfaces/IERC20.sol";
 import "../interfaces/IGeras.sol";
 import "../interfaces/IRewardFlow.sol";
 import "../interfaces/ISTT.sol";

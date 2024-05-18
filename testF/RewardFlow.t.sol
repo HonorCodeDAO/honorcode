@@ -71,7 +71,7 @@ contract RewardFlowTest is Test {
         uint amtStaked = geras.totalSupply();
         uint lastUp = geras.lastUpdated();
 
-        uint vouchAmt = hnr.vouch(address(root), newA, amount);
+        uint vouchAmt = hnr.vouch(address(root), newA, amount, true);
 
         // This may not equal mockAmt due to the rebase mechanism...
         assertEq(amtStaked, (mockERC.balanceOf(address(geras)) * stakeToVSA) >> 60, 
@@ -100,7 +100,7 @@ contract RewardFlowTest is Test {
         vm.warp(block.timestamp + duration);
 
         rootRF.payForward();
-        vouchAmt = hnr.vouch(address(root), newA, amount / 1000);
+        vouchAmt = hnr.vouch(address(root), newA, amount / 1000, true);
 
         uint builderRootVouch = root.balanceOf(builder);
         uint accbuilderRootVouch = root.accRewardClaim(builder);
@@ -137,7 +137,7 @@ contract RewardFlowTest is Test {
         uint amtStaked = geras.totalSupply();
         uint lastUp = geras.lastUpdated();
 
-        uint vouchAmt = hnr.vouch(address(root), newA, amount);
+        uint vouchAmt = hnr.vouch(address(root), newA, amount, true);
 
         // This may not equal mockAmt due to the rebase mechanism...
         assertEq(amtStaked, (mockERC.balanceOf(address(geras)) * stakeToVSA) >> 60, 
@@ -166,7 +166,7 @@ contract RewardFlowTest is Test {
 
         geras.payForward(address(root));
 
-        vouchAmt = hnr.vouch(address(root), newA, amount / 1000);
+        vouchAmt = hnr.vouch(address(root), newA, amount / 1000, true);
 
         uint builderRootVouch = root.balanceOf(builder);
         uint accbuilderRootVouch = root.accRewardClaim(builder);
@@ -203,8 +203,8 @@ contract RewardFlowTest is Test {
 
         vm.warp(block.timestamp + duration);
         uint accHnrHours = duration * hnr.balanceOf(address(newA)) / 7776000;
-        uint expectedBuilderV = SafeMath.floorCbrt(accHnrHours) * 2**40;
-        uint newvouchAmt = hnr.vouch(address(root), newA, 0.0001 ether);
+        uint expectedBuilderV = SafeMath.floorCbrt((accHnrHours >> 30) << 30) * 2**40;
+        uint newvouchAmt = hnr.vouch(address(root), newA, 0.0001 ether, false);
         uint preMintHnr = hnr.balanceOf(address(root));
 
         hnr.mintToStakers();
@@ -297,8 +297,8 @@ contract RewardFlowTest is Test {
         uint amtStaked = geras.totalSupply();
         uint lastUp = geras.lastUpdated();
 
-        uint vouchAmt = hnr.vouch(address(root), newA, amount);
-        hnr.vouch(address(root), newB, amount);
+        uint vouchAmt = hnr.vouch(address(root), newA, amount, true);
+        hnr.vouch(address(root), newB, amount, true);
 
 
         address newRF = (rfact.createRewardFlow(address(hnr), newA, address(geras)));
@@ -329,7 +329,7 @@ contract RewardFlowTest is Test {
 
         rootRF.payForward();
         vm.prank(builder);
-        vouchAmt = hnr.vouch(address(root), newA, amount / 1000);
+        vouchAmt = hnr.vouch(address(root), newA, amount / 1000, true);
 
         uint builderRootVouch = root.balanceOf(builder);
         uint accbuilderRootVouch = root.accRewardClaim(builder);
@@ -357,7 +357,7 @@ contract RewardFlowTest is Test {
         // assertEq(availableGerasA, RewardFlow(newRF).availableReward(), 'availableRewardA');
         
         vm.prank(builder);
-        hnr.vouch(address(root), newB, amount / 1000);
+        hnr.vouch(address(root), newB, amount / 1000, true);
         uint builderVouchA = Artifact(newA).balanceOf(builder);
         // assertEq(builderVouchA, Artifact(newA).totalSupply(), 'new artifact builder vouch');
         uint accbuilderVouchA = Artifact(newA).accRewardClaim(builder);

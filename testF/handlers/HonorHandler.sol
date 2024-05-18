@@ -40,7 +40,7 @@ contract HonorHandler is Test {
         vm.startPrank(hnr.owner());
         hnr.vouch(knownArtifacts[senderIdx], 
             knownArtifacts[receiverIdx % artifactCount], 
-            amt % IArtifact(knownArtifacts[senderIdx]).totalSupply());
+            amt % IArtifact(knownArtifacts[senderIdx]).totalSupply(), true);
         vm.stopPrank();
     }
 

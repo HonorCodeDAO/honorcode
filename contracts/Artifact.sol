@@ -127,6 +127,19 @@ contract Artifact is IArtifact {
         return _accRewardClaims[claimer];
     } 
 
+    function vouchAmtPerHonor(uint honorAmt) external override view returns (
+        uint) {
+        return _totalSupply - ((((
+            SafeMath.floorSqrt(honorWithin - honorAmt)) * _totalSupply) / ( 
+            SafeMath.floorSqrt(honorWithin))));
+    }
+
+    function honorAmtPerVouch(uint vouchAmt) external override view returns (
+        uint) {
+        return honorWithin - ((honorWithin * ((_totalSupply - vouchAmt) ** 2) /(
+                (_totalSupply ** 2))));
+    }
+
     /** 
       * Given some input honor to this artifact, return the output vouch amount. 
       * The change in vouch claim will be calculated from the difference in 
@@ -140,6 +153,8 @@ contract Artifact is IArtifact {
       * is that it can be renormalized by adding 30 bits to the calculated root. 
       * (or if cube roots are used, 20 bits can be added). Essentially we are 
       * taking sqrt(X) * sqrt(2^60) to keep the curves reasonably in line. 
+      * The formula for Delta(V) is:
+      * V_out = sqrt(H_T + H_in) * V_T / sqrt(H_T) - V_T
     */
     function vouch(address account) external override returns(uint vouchAmt) {
         uint totalHonor = ISTT(honorAddr).balanceOf(address(this));
@@ -240,7 +255,10 @@ contract Artifact is IArtifact {
 
     /* 
      * The amount of the vouch claim going to the builder will increase based on 
-     * the vouched HONOR over time. 
+     * the vouched HONOR over time, which is tracked by accumulated HONOR hours. 
+     * However, below a floor of 2^30 we do not add to the builder amount, 
+     * because the cube root would be too distorted.
+     * This means that the builder comp begins at 2^50 = 2^10 * 2^40 units.
      */
     function recomputeBuilderVouch() private returns (uint newBuilderVouchAmt) {
         if (ISTT(honorAddr).rootArtifact() == address(this)) { 
@@ -248,9 +266,9 @@ contract Artifact is IArtifact {
         }
         uint newHonorQtrs = ((block.timestamp - uint(_lastUpdated)) * (
             honorWithin)) / 7776000;
-        newBuilderVouchAmt = (SafeMath.floorCbrt(
-            (accHonorHours + newHonorQtrs)) << 40) - (
-            SafeMath.floorCbrt(accHonorHours) << 40);
+        newBuilderVouchAmt = (SafeMath.floorCbrt((
+            (accHonorHours + newHonorQtrs) >> 30) << 30) << 40) - (
+            SafeMath.floorCbrt((accHonorHours >> 30) << 30) << 40);
         accHonorHours += newHonorQtrs;
         _lastUpdated = uint32(block.timestamp);
         if (newBuilderVouchAmt <= 0) {

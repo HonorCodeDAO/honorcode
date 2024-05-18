@@ -45,14 +45,18 @@ contract HonorTest is Test {
         uint rootVouch = root.balanceOf(builder);
         assertEq(rootVouch, root.totalSupply());
         uint rootBal = hnr.balanceOf(address(root));
-        uint expectedHnrOut = rootBal - (rootBal * (rootVouch - amount) ** 2) / (root.totalSupply() ** 2);
-        uint vouchAmt = hnr.vouch(address(root), newA, amount);
 
-        assertEq(hnr.balanceOf(address(newA)), expectedHnrOut + 2 ether, 
+        uint unvouchAmt = root.vouchAmtPerHonor(amount);
+        uint revouchAmt = hnr.vouch(address(root), newA, amount, true);
+        uint expectedHnrOut = rootBal - (rootBal * (rootVouch - unvouchAmt) ** 2) / (root.totalSupply() ** 2);
+
+        assertEq(hnr.balanceOf(address(newA)), amount + 2 ether, 
             'expected HONOR in new address incorrect');
-        assertEq(hnr.balanceOf(address(root)), 9998 ether - expectedHnrOut, 
+        assertEq(hnr.balanceOf(address(root)), 9998 ether - amount, 
             'expected HONOR in root incorrect');
 
+        assertEq(root.totalSupply(), rootVouch - unvouchAmt, 
+            'expected root Vouch incorrect');
     }
 
     function testBuilderChange(uint amount, uint32 duration) public {
@@ -66,11 +70,10 @@ contract HonorTest is Test {
         vm.prank(builder);
         address newA = hnr.proposeArtifact(address(root), address(808), 'newA', true);
 
-
         vm.warp(block.timestamp + duration);
         uint accHnrHours = duration * hnr.balanceOf(address(newA)) / 7776000;
-        uint expectedBuilderV = SafeMath.floorCbrt(accHnrHours) * 2**40;
-        uint newvouchAmt = hnr.vouch(address(root), newA, 0.0001 ether);
+        uint expectedBuilderV = SafeMath.floorCbrt(((accHnrHours>> 30) << 30)) * 2**40;
+        uint newvouchAmt = hnr.vouch(address(root), newA, 0.0001 ether, true);
 
 
         emit log_uint(hnr.balanceOfArtifact(address(root), builder));

@@ -15,6 +15,8 @@ interface IArtifact {
     function honorWithin() external view returns(uint);
     function honorAddr() external view returns(address);
     function location() external view returns(string memory);
+    function vouchAmtPerHonor(uint honorAmt) external view returns (uint);
+    function honorAmtPerVouch(uint vouchAmt) external view returns (uint);
     // function getNetHonor() external view returns(uint);
     function builder() external view returns(address);
     function accHonorHours() external view returns(uint);

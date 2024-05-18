@@ -98,22 +98,25 @@ contract Honor is ISTT {
      * This includes checking whether the destination is validated, and overseeing the 
      * transfer of base HONOR. 
      */ 
-    function vouch(address _from, address _to, uint amount) external override 
-    returns(uint revouchAmt) {
+    function vouch(address _from, address _to, uint amount, bool isHonor) 
+    external override returns(uint revouchAmt) {
         require((IArtifact(_from).honorAddr() == address(this)) && (
             IArtifact(_to).honorAddr() == address(this)), 
             'HONOR: artifact doesnt exist');
         require(_balances[_to] != 0 && _balances[_from] != 0 && (
             IArtifact(_to).isValidated()), "HONOR: Invalid vouch");
-        require(IArtifact(_from).balanceOf(msg.sender) >= amount, 
+
+        uint vouchAmt = !isHonor ? amount : IArtifact(_from).vouchAmtPerHonor(amount);
+        require(IArtifact(_from).balanceOf(msg.sender) >= vouchAmt, 
             "HONOR: Insuff. vouch bal");
 
-        uint hnrAmt = IArtifact(_from).unvouch(msg.sender, amount, false);
-        _transfer(_from, _to, hnrAmt);
+        uint reHonor = IArtifact(_from).unvouch(msg.sender, amount, isHonor);
+        
+        _transfer(_from, _to, isHonor ? amount : reHonor);
 
         revouchAmt = IArtifact(_to).vouch(msg.sender); 
 
-        emit Vouch(msg.sender, _from, _to, hnrAmt);
+        emit Vouch(msg.sender, _from, _to, amount);
     }
 
     /* 

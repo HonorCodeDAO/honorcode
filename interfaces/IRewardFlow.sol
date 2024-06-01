@@ -11,6 +11,7 @@ interface IRewardFlow {
     function nextAllocator() external view returns (address);
     function totalGeras() external view returns (uint);
     function setArtifact() external;
+    function setNonOwnerActive(bool active) external;
     function submitAllocation(address targetAddr, uint8 amt, address voucher) external returns(uint);
     function redeemReward(address claimer, uint redeemAmt) external returns (uint);
     event Allocate(address indexed from, address indexed to, uint256 value);

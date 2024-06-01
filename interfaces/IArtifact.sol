@@ -23,7 +23,7 @@ interface IArtifact {
     function totalSupply() external view returns (uint256);
     function rewardFlow() external view returns(address);
     function setRewardFlow() external returns(address);
-    function accRewardClaim(address claimer) external returns (uint);
+    function accRewardClaim(address claimer, bool activeOnly) external returns (uint);
     function redeemRewardClaim(address voucher, uint256 redeemAmt) external;
 
     event Transfer(address indexed from, address indexed to, uint256 value);

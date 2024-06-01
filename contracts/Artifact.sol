@@ -123,8 +123,17 @@ contract Artifact is IArtifact {
         _accRewardClaims[address(this)] = _accRewardClaims[address(this)] - redeemAmt;
     }
 
-    function accRewardClaim(address claimer) external override returns (uint) {
-        return _accRewardClaims[claimer];
+    function accRewardClaim(address claimer, bool activeOnly) 
+    external override view returns (uint) {
+        if (!activeOnly) {
+            return _accRewardClaims[claimer];
+        }
+        if  (claimer == address(this)) {
+            return _accRewardClaims[claimer] - (
+            _accRewardClaims[ISTT(honorAddr).owner()]);
+        }
+        return (claimer == ISTT(honorAddr).owner()) ? 0 : (
+            _accRewardClaims[claimer]);
     } 
 
     function vouchAmtPerHonor(uint honorAmt) external override view returns (

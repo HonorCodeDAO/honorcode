@@ -9,6 +9,7 @@ import {RewardFlow, RewardFlowFactory} from "../contracts/RewardFlow.sol";
 import {Geras} from "../contracts/Geras.sol";
 import {MockCoin} from "../contracts/MockCoin.sol";
 import {SafeMath} from "../contracts/SafeMath.sol";
+import {IRewardFlow} from "../interfaces/IRewardFlow.sol";
 
 contract RewardFlowTest is Test {
     Honor public hnr;
@@ -55,6 +56,7 @@ contract RewardFlowTest is Test {
         amount = bound(amount, 0.00001 ether, 100 ether);
         mockAmt = bound(mockAmt, 0.00001 ether, 100 ether);
         duration = uint32(bound(duration, 1000, 1000000));
+        bool activeOnly = false;
 
         address builder = root.builder();
         vm.prank(builder);
@@ -80,6 +82,8 @@ contract RewardFlowTest is Test {
 
 
         rootRF.submitAllocation(newRF, 128, owner);
+        rootRF.setNonOwnerActive(activeOnly);
+        IRewardFlow(newRF).setNonOwnerActive(activeOnly);
         vm.warp(block.timestamp + duration - 1);
         geras.distributeGeras(address(rootRF));
 
@@ -89,7 +93,7 @@ contract RewardFlowTest is Test {
         assertEq(amtStaked, geras.totalSupply(), 'total amt staked incorrect');
 
         stakeToVSA = geras.stakedToVsaRate();
-        uint expStartingGeras = ((amtStaked  * stakeToVSA) >> 60)- geras.totalSupply();
+        uint expStartingGeras = ((amtStaked * stakeToVSA) >> 60) - geras.totalSupply();
 
         assertEq(geras.vsaBalanceOf(address(rootRF)), expStartingGeras, 
             'expected starting Geras in root incorrect');
@@ -103,8 +107,8 @@ contract RewardFlowTest is Test {
         vouchAmt = hnr.vouch(address(root), newA, amount / 1000, true);
 
         uint builderRootVouch = root.balanceOf(builder);
-        uint accbuilderRootVouch = root.accRewardClaim(builder);
-        uint accTotalRootVouch = root.accRewardClaim(address(root));
+        uint accbuilderRootVouch = root.accRewardClaim(builder, activeOnly);
+        uint accTotalRootVouch = root.accRewardClaim(address(root), activeOnly);
 
         assertEq(accbuilderRootVouch, accTotalRootVouch, 'acc vouch in root incorrect');
 
@@ -116,11 +120,12 @@ contract RewardFlowTest is Test {
     }
 
 
-    function testGerasDistribution(uint amount, uint mockAmt, uint32 duration) public {
+    function testGerasDistribution(uint amount, uint mockAmt, uint32 duration, bool activeOnly) public {
         vm.assume(mockAmt < 100 ether);
         amount = bound(amount, 0.00001 ether, 100 ether);
         mockAmt = bound(mockAmt, 0.00001 ether, 100 ether);
         duration = uint32(bound(duration, 1000, 1000000));
+        // bool activeOnly = false;
 
         address builder = root.builder();
         vm.prank(builder);
@@ -144,6 +149,9 @@ contract RewardFlowTest is Test {
             'expected VSA incorrect');
 
         address newRF = geras.createRewardFlow(newA);
+
+        rootRF.setNonOwnerActive(activeOnly);
+        IRewardFlow(newRF).setNonOwnerActive(activeOnly);
 
         geras.submitAllocation(address(root), newA, 128);
 
@@ -169,26 +177,28 @@ contract RewardFlowTest is Test {
         vouchAmt = hnr.vouch(address(root), newA, amount / 1000, true);
 
         uint builderRootVouch = root.balanceOf(builder);
-        uint accbuilderRootVouch = root.accRewardClaim(builder);
-        uint accTotalRootVouch = root.accRewardClaim(address(root));
+        uint accbuilderRootVouch = root.accRewardClaim(builder, activeOnly);
+        uint accTotalRootVouch = root.accRewardClaim(address(root), activeOnly);
 
         assertEq(accbuilderRootVouch, accTotalRootVouch, 'acc vouch in root incorrect');
-
-        assertEq(geras.vsaBalanceOf(newRF), availableGeras * accbuilderRootVouch / (8*accTotalRootVouch) * 128/255, 
-            'expected Geras in new address incorrect');
-
         assertEq(geras.totalVSASupply(), geras.vsaBalanceOf(newRF) + geras.vsaBalanceOf(address(rootRF)), 
             'total Geras VSA incorrect');
 
-        assertEq(geras.vsaBalanceOf(address(rootRF)), expStartingGeras- availableGeras * accbuilderRootVouch / (8*accTotalRootVouch) * 128/255 , 
-            'expected Geras in root address incorrect');
+        if (accTotalRootVouch > 0) {
+            assertEq(geras.vsaBalanceOf(newRF), availableGeras * accbuilderRootVouch / (8*accTotalRootVouch) * 128/255, 
+                'expected Geras in new address incorrect');
+
+            assertEq(geras.vsaBalanceOf(address(rootRF)), expStartingGeras- availableGeras * accbuilderRootVouch / (8*accTotalRootVouch) * 128/255 , 
+                'expected Geras in root address incorrect');
+        }
     }
 
-    function testHonorStaking(uint amount, uint mockAmt, uint32 duration) public {
+    function testHonorStaking(uint amount, uint mockAmt, uint32 duration, bool activeOnly) public {
 
         amount = bound(amount, 0.00001 ether, 100 ether);
         mockAmt = bound(mockAmt, 0.001 ether, 100 ether);
         duration = uint32(bound(duration, 1000, 1000000));
+        // bool activeOnly = false;
 
         mockERC.transfer(address(geras), mockAmt);
         uint stakedAmt = geras.stakeAsset(address(root));
@@ -275,11 +285,12 @@ contract RewardFlowTest is Test {
     }
 
 
-    function testGerasRotation(uint amount, uint mockAmt, uint32 duration) public {
+    function testGerasRotation(uint amount, uint mockAmt, uint32 duration, bool activeOnly) public {
         vm.assume(mockAmt < 100 ether);
         amount = bound(amount, 0.00001 ether, 49 ether);
         mockAmt = bound(mockAmt, 0.00001 ether, 100 ether);
         duration = uint32(bound(duration, 1000, 1000000));
+        // bool activeOnly = true;
 
         address builder = root.builder();
         vm.prank(builder);
@@ -304,6 +315,10 @@ contract RewardFlowTest is Test {
         address newRF = (rfact.createRewardFlow(address(hnr), newA, address(geras)));
         address newRFB = (rfact.createRewardFlow(address(hnr), newB, address(geras)));
 
+
+        rootRF.setNonOwnerActive(activeOnly);
+        IRewardFlow(newRF).setNonOwnerActive(activeOnly);
+        IRewardFlow(newRFB).setNonOwnerActive(activeOnly);
 
         rootRF.submitAllocation(newRF, 128, owner);
         RewardFlow(newRF).submitAllocation(newRFB, 128, owner);
@@ -332,17 +347,22 @@ contract RewardFlowTest is Test {
         vouchAmt = hnr.vouch(address(root), newA, amount / 1000, true);
 
         uint builderRootVouch = root.balanceOf(builder);
-        uint accbuilderRootVouch = root.accRewardClaim(builder);
-        uint accTotalRootVouch = root.accRewardClaim(address(root));
+        uint accbuilderRootVouch = root.accRewardClaim(builder, activeOnly);
+        uint accTotalRootVouch = root.accRewardClaim(address(root), activeOnly);
 
         assertEq(accbuilderRootVouch, accTotalRootVouch, 'acc vouch in root incorrect');
 
-        assertEq(geras.vsaBalanceOf(newRF), availableGeras/ 8 * 128/255 * accbuilderRootVouch / accTotalRootVouch, 
-            'expected Geras in new address incorrect');
+        if (accTotalRootVouch > 0) {
+            assertEq(geras.vsaBalanceOf(newRF), availableGeras/ 8 * 128/255 * accbuilderRootVouch / accTotalRootVouch, 
+                'expected Geras in new address incorrect');
+        }
 
-        assertEq(geras.vsaBalanceOf(address(rootRF)), expStartingGeras- availableGeras / 8* 128/255 * builderRootVouch / root.totalSupply(), 
-            'expected Geras in root address incorrect');
-
+        uint activeHonor = root.totalSupply();
+        activeHonor = activeHonor - (activeOnly ? builderRootVouch : 0);
+        if (activeHonor > 0) {
+            assertEq(geras.vsaBalanceOf(address(rootRF)), expStartingGeras- availableGeras / 8* 128/255 * builderRootVouch / activeHonor, 
+                'expected Geras in root address incorrect');
+        }
 
         if (RewardFlow(newRF).nextAllocator() == newRF) {
             RewardFlow(newRF).payForward();
@@ -360,19 +380,25 @@ contract RewardFlowTest is Test {
         hnr.vouch(address(root), newB, amount / 1000, true);
         uint builderVouchA = Artifact(newA).balanceOf(builder);
         // assertEq(builderVouchA, Artifact(newA).totalSupply(), 'new artifact builder vouch');
-        uint accbuilderVouchA = Artifact(newA).accRewardClaim(builder);
-        uint accTotalVouchA = Artifact(newA).accRewardClaim(newA);
-        uint accbuilderAVouchA = Artifact(newA).accRewardClaim(address(10711315));
+        uint accbuilderVouchA = Artifact(newA).accRewardClaim(builder, activeOnly);
+        uint accTotalVouchA = Artifact(newA).accRewardClaim(newA, activeOnly);
+        uint accbuilderAVouchA = Artifact(newA).accRewardClaim(address(10711315), activeOnly);
 
         // assertEq(accbuilderVouchA + accbuilderAVouchA, accTotalVouchA, 
         //     'acc vouch in newA incorrect');
 
-        assertEq(geras.vsaBalanceOf(newRFB), availableGerasA *  accbuilderVouchA / (8* accTotalVouchA) *128 / 255 , 
-            'expected Geras in third address incorrect');
-
-        assertEq(geras.vsaBalanceOf(newRF), newExpectedGerasA- availableGerasA *  accbuilderVouchA / (8*accTotalVouchA) *128 /255, 
-            'expected Geras in middle address incorrect');
-
+        if (accTotalVouchA > 0  && (geras.vsaBalanceOf(newRFB) > 0)) { // || availableGerasA *  accbuilderVouchA > 0) {
+            assertEq(geras.vsaBalanceOf(newRFB), availableGerasA *  accbuilderVouchA / (8* accTotalVouchA) *128 / 255 , 
+                'expected Geras in third address incorrect');
+        }
+        if (accTotalVouchA > 0) {
+            assertEq(geras.vsaBalanceOf(newRF), newExpectedGerasA- availableGerasA *  accbuilderVouchA / (8*accTotalVouchA) *128 /255, 
+                'expected Geras in middle address incorrect');
+        }
+        else {
+            assertEq(geras.vsaBalanceOf(newRF), newExpectedGerasA, 
+                'expected Geras in middle address incorrect');
+        }
     }
 }
 

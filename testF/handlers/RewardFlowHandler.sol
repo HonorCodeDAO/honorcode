@@ -52,7 +52,7 @@ contract RewardFlowHandler is Test {
         duration = uint32(bound(duration, 1000, 1000000));
         vm.startPrank(owner);
         amt = (bound(amt, 1000, IArtifact(IRewardFlow(
-            rfs[redeemerIdx % rfs.length]).artifactAddr()).accRewardClaim(owner)));
+            rfs[redeemerIdx % rfs.length]).artifactAddr()).accRewardClaim(owner, false)));
         vm.warp(block.timestamp + duration);
         IRewardFlow(rfs[redeemerIdx % rfs.length]).redeemReward(owner, amt);
         vm.stopPrank();

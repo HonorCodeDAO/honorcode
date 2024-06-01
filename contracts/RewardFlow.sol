@@ -82,6 +82,7 @@ contract RewardFlow is IRewardFlow {
     uint public availableReward;
     uint public totalGeras;
     bool public isRoot;
+    bool public activeOnly;
 
 
     constructor(address artifactAddr_, address gerasAddr_) {
@@ -94,6 +95,8 @@ contract RewardFlow is IRewardFlow {
         if (artifactAddr == ISTT(IArtifact(artifactAddr).honorAddr()).rootArtifact()) {
             isRoot = true;
         }
+        // Default is to only allow rewards to flow to active (non-owner) members
+        activeOnly = false;
         // Default is to keep all flow to this artifact.
         _lastUpdated = uint32(block.timestamp);
         BQueue.incrementFirst(bq);
@@ -107,6 +110,13 @@ contract RewardFlow is IRewardFlow {
 
     function setArtifact() external override {
         IArtifact(artifactAddr).setRewardFlow();
+    }
+
+    function setNonOwnerActive(bool active) external {
+        require ((msg.sender == IArtifact(artifactAddr).builder()) ||
+            (msg.sender == ISTT(IArtifact(artifactAddr).honorAddr()).owner()),
+                'Only owner or builder can change activeOnly');
+        activeOnly = active;
     }
 
     // Add some to the amount available to be paid out to others. The remainder
@@ -151,18 +161,24 @@ contract RewardFlow is IRewardFlow {
         }
 
         if (rewarderAddr == address(this)) {
-            if (isRoot) { 
+            nextV = isRoot ? 0 : artifact_.accRewardClaim(
+                artifactAddr, activeOnly) / 2;
+            if (nextV == 0) { 
                 BQueue.requeue(bq);
                 return (address(this), 0); 
             }
-            nextV = artifact_.accRewardClaim(artifactAddr) / 2;
         }
 
         target = allocations[rewarderAddr].target; 
         uint alloc = uint(allocations[rewarderAddr].amount);
 
+        uint totalAccR = artifact_.accRewardClaim(artifactAddr, activeOnly);
+        if (totalAccR == 0) {
+            BQueue.requeue(bq);
+            return (address(this), 0); 
+        }
         uint amtToMove = availableReward * nextV / (
-            artifact_.accRewardClaim(artifactAddr) * 2 * FRACTION_TO_PASS);
+            artifact_.accRewardClaim(artifactAddr, activeOnly) * 2 * FRACTION_TO_PASS);
         rewardAmt = amtToMove * alloc / MAX_ALLOC;
         BQueue.requeue(bq);
 
@@ -249,8 +265,8 @@ contract RewardFlow is IRewardFlow {
         uint availableGeras) {
         // The artifact checks that the claimer is valid and the returns the 
         // percentage that the redemption amounts to.
-        uint totalClaim = IArtifact(artifactAddr).accRewardClaim(artifactAddr);
-        uint availableClaim = IArtifact(artifactAddr).accRewardClaim(claimer);
+        uint totalClaim = IArtifact(artifactAddr).accRewardClaim(artifactAddr, activeOnly);
+        uint availableClaim = IArtifact(artifactAddr).accRewardClaim(claimer, activeOnly);
         require(totalClaim > 0, 'RF: Total claim is zero');
         require(IGeras(gerasAddr).vsaBalanceOf(address(this)) > availableReward, 
             'No Geras is available');
